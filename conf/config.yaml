@@ -1,0 +1,14 @@
+defaults:
+  - dataset: cifar10
+  - heterogeneity: dirichlet_alpha_0.1
+  - algorithm: fedavg
+  - experiment: default
+  - _self_
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+seed: 42

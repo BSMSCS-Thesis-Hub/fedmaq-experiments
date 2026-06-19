@@ -1,0 +1,7 @@
+# Default hyperparameters (see .cursor/rules/hyperparameters.mdc)
+batch_size: 64
+local_epochs: 5
+learning_rate: 0.01
+weight_decay: 0.99
+client_fraction: 0.1
+total_rounds: 100
