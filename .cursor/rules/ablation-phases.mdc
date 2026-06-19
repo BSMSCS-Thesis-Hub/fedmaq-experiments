@@ -1,0 +1,18 @@
+---
+description: Four-phase ablation methodology and code layout
+globs: src/**,conf/**
+alwaysApply: false
+---
+
+# Ablation Phases
+
+Structure code sequentially under `src/fedmaq/`:
+
+| Phase | Package | Goal |
+| ----- | ------- | ---- |
+| 1 | `phase1_env/` | PyTorch/Flower env, vision datasets, Dirichlet non-IID, bandwidth stragglers |
+| 2 | `phase2_quant/` | Isolate resource/data/time-aware uplink quantization vs static baselines |
+| 3 | `phase3_kd/` | Server-side logit/feature KD to recover accuracy from quantization noise |
+| 4 | `phase4_benchmark/` | Unified FedMAQ vs SOTA across datasets |
+
+Do not skip phases when adding features. Baselines live in `baselines/`, not separate top-level reproduction folders.

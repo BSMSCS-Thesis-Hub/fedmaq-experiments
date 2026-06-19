@@ -1,0 +1,130 @@
+---
+name: agent-handoff
+description: >-
+  Updates fedmaq-experiments/HANDOFF.md and produces a copy-paste handoff message
+  for the next Cursor agent session. Use when ending a work session, preparing
+  handoff, handing off to a new agent, or when the user says "handoff" or
+  "update handoff".
+---
+
+# Agent Handoff
+
+End-of-session workflow for the FedMAQ multi-repo workspace. Keeps [HANDOFF.md](../../HANDOFF.md) current and gives the user a ready-to-paste message for the next chat.
+
+## When to run
+
+- User asks to hand off, prepare handoff, or end session with continuity
+- Before closing a long implementation session
+- After completing a queue item or switching primary repo
+
+## Procedure
+
+### 1. Gather session facts
+
+From the current conversation and git status, determine:
+
+- **Date** (YYYY-MM-DD)
+- **Last session focus** (one line)
+- **Active repo** (primary repo worked in)
+- **Completed** (bullets: what changed, files/areas)
+- **Next task** (single concrete item from HANDOFF.md Section 6, or new item)
+- **Blockers** (or "None")
+- **Constraints** for next agent (optional: env, GPU, do-nots)
+
+### 2. Update HANDOFF.md
+
+Edit [HANDOFF.md](../../HANDOFF.md):
+
+| Section                     | Update                                                          |
+| --------------------------- | --------------------------------------------------------------- |
+| Top table                   | `Last updated`, `Last session focus`, `Active repo`, `Blockers` |
+| Section 4 (per-repo status) | Move items from Pending → Done where applicable                 |
+| Section 6 (queue)           | Mark completed `[x]`; set **Current focus** to next task        |
+| Section 7                   | Add any new env vars                                            |
+| Section 10 (changelog)      | Prepend new `### YYYY-MM-DD — <title>` with 3–8 bullets         |
+
+**Rules:**
+
+- Keep changelog entries factual; no emojis.
+- Do not remove locked decisions (Section 3) unless user explicitly changed them.
+- If scope changed, update Section 3 or 5 and note in changelog.
+
+### 3. Emit handoff message
+
+Output a single markdown code block for the user to paste into the **next** agent chat. Use this structure exactly:
+
+```markdown
+## FedMAQ workspace handoff
+
+**Read first:** [HANDOFF.md](fedmaq-experiments/HANDOFF.md) (multi-root: open all fedmaq-\* repos)
+
+**Thesis:** FedMAQ — communication-efficient FL via multi-adaptive quantization + server-side KD (vision classification: CIFAR/MNIST/FMNIST/FEMNIST).
+
+**Last session ({DATE}):** {LAST_SESSION_FOCUS}
+
+**Completed:**
+
+- {bullet 1}
+- {bullet 2}
+
+**Next task:** {NEXT_TASK}
+
+**Primary repo:** `{REPO}`
+
+**Read before coding:**
+
+- `fedmaq-experiments/.cursor/rules/` (domain)
+- `{REPO}/AGENTS.md`
+- `{REPO}/.cursor/skills/` if relevant
+
+**Constraints:** {CONSTRAINTS_OR_NONE}
+
+**Do not:** parse PDFs in chat; auto-approve literature drafts; duplicate domain rules outside experiments.
+```
+
+Fill all `{PLACEHOLDERS}` with real content. Add bullets under **Completed** only for work done this session.
+
+### 4. Confirm to user
+
+After updating the file and emitting the message, tell the user:
+
+1. `HANDOFF.md` was updated (mention sections touched).
+2. They can copy the handoff block into a new chat.
+3. Optional: commit HANDOFF.md with their other changes.
+
+## Example handoff message (illustrative)
+
+```markdown
+## FedMAQ workspace handoff
+
+**Read first:** [HANDOFF.md](fedmaq-experiments/HANDOFF.md) (multi-root: open all fedmaq-\* repos)
+
+**Thesis:** FedMAQ — communication-efficient FL via multi-adaptive quantization + server-side KD (vision classification: CIFAR/MNIST/FMNIST/FEMNIST).
+
+**Last session (2026-06-18):** Literature PDF conversion scaffold
+
+**Completed:**
+
+- Implemented Docling adapter in `src/fedmaq_literature/convert/docling.py`
+- Added QA heuristics and `meta.yaml` schema
+
+**Next task:** Wire Marker GPU fallback when QA confidence < threshold
+
+**Primary repo:** `fedmaq-literature`
+
+**Read before coding:**
+
+- `fedmaq-experiments/.cursor/rules/`
+- `fedmaq-literature/AGENTS.md`
+- `fedmaq-literature/.cursor/skills/ingest-paper/`
+
+**Constraints:** Serialize GPU jobs; RTX 5060 8GB — no concurrent convert + Qwen3-4B embed.
+
+**Do not:** parse PDFs in chat; auto-approve literature drafts; duplicate domain rules outside experiments.
+```
+
+## Related files
+
+- Canonical handoff: [HANDOFF.md](../../HANDOFF.md)
+- Domain rules: [`.cursor/rules/`](../rules/)
+- Sibling AGENTS.md files reference HANDOFF.md from other repos
