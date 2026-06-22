@@ -117,6 +117,12 @@ papers/*.pdf
 
 **GPU (RTX 5060 8GB):** Do not run Docling/Marker and 4B embedder concurrently.
 
+> [!IMPORTANT]
+> **Expected Execution Runtimes:**
+>
+> - **Full PDF to Markdown Conversion (Docling + Marker QA):** ~6.5 to 7 hours total. Avoid re-running conversions from scratch unless necessary.
+> - **Full RAG Ingestion & Embedding (Qwen3-Embedding-4B):** ~15 to 30 minutes per paper on CUDA GPU (RTX 5060). Standard output may buffer during the batch embedding pipeline, so check progress by checking `nvidia-smi` GPU utilization or `storage/chroma/chroma.sqlite3` file growth.
+
 **Skills:** `.cursor/skills/ingest-paper`, `summarize-paper`, `approve-summary`, `query-literature` (synthesize skills TBD).
 
 **Component Roles & Purpose:**
@@ -188,6 +194,13 @@ Create `.env` locally (gitignored); document new vars here when added.
 ## 10. Changelog
 
 Reverse chronological. Agents append one entry per session when using `agent-handoff` skill.
+
+### 2026-06-22 — Math loop collapse deduplication and RAG database re-embedding
+
+- Identified layout/OCR model loop collapse (repetitive `\quad \text {to}`, `\quad \text {to be}`, `\ ` spaces, etc.) in 13 converted papers that corrupted RAG retrieval.
+- Implemented `deduplicate_math` inside `_clean_math_block` to clean loop collapses, strip empty math blocks, and normalize spacing specifically within math blocks without affecting markdown tables.
+- Ran cleanup across the entire converted markdown corpus and validated that 13 papers were cleaned successfully.
+- Reverted/cleaned existing Chroma vector storage and launched a full CUDA re-embedding task (`uv run fedmaq-lit ingest --all`) on Qwen3-Embedding-4B in FP16 precision.
 
 ### 2026-06-22 — CLI summarize, approve, query commands implemented
 
