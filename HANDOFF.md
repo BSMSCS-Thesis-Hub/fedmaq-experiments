@@ -2,12 +2,12 @@
 
 Living document for agent-to-agent and session-to-session continuity across the FedMAQ thesis multi-repo workspace.
 
-| Field                  | Value                                                       |
-| ---------------------- | ----------------------------------------------------------- |
-| **Last updated**       | 2026-06-21                                                  |
-| **Last session focus** | Complete literature paper registration and batch conversion |
-| **Active repo**        | fedmaq-literature                                           |
-| **Blockers**           | None                                                        |
+| Field                  | Value                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-06-22                                                                       |
+| **Last session focus** | Implement CLI summarize, approve, and query commands with OpenRouter integration |
+| **Active repo**        | fedmaq-literature                                                                |
+| **Blockers**           | None                                                                             |
 
 ---
 
@@ -56,7 +56,7 @@ Living document for agent-to-agent and session-to-session continuity across the 
 
 ## 4. Per-repo status
 
-### fedmaq-experiments — [SCaffold complete]
+### fedmaq-experiments — [Scaffold complete]
 
 | Done                                                           | Pending                                         |
 | -------------------------------------------------------------- | ----------------------------------------------- |
@@ -66,16 +66,18 @@ Living document for agent-to-agent and session-to-session continuity across the 
 
 Key paths: `src/fedmaq/phase1_env/` … `phase4_benchmark/`, `.cursor/project/baseline_registry.md`
 
-### fedmaq-literature — [Scaffold complete]
+### fedmaq-literature — [Complete]
 
-| Done                                                                   | Pending                                         |
-| ---------------------------------------------------------------------- | ----------------------------------------------- |
-| Folder layout, `.cursor/` rules/skills, `paper_registry.md` (complete) | OpenRouter summarize workflow, approve commands |
-| Docling + Marker convert pipeline, QA, `meta.yaml`, CLI                |                                                 |
-| `fedmaq-lit convert` / `ingest --convert-only`, unit tests             |                                                 |
-| Smoke-tested on `hinton-2015-distillation`, `li-2020-fedprox`          |                                                 |
-| Batch conversion CLI (`--all` flag) and registration of all 29 papers  |                                                 |
-| LlamaIndex + Chroma ingest with Qwen3-4B                               |                                                 |
+| Done                                                                   | Pending |
+| ---------------------------------------------------------------------- | ------- |
+| Folder layout, `.cursor/` rules/skills, `paper_registry.md` (complete) | None    |
+| Docling + Marker convert pipeline, QA, `meta.yaml`, CLI                |         |
+| `fedmaq-lit convert` / `ingest --convert-only`, unit tests             |         |
+| Smoke-tested on `hinton-2015-distillation`, `li-2020-fedprox`          |         |
+| Batch conversion CLI (`--all` flag) and registration of all 29 papers  |         |
+| LlamaIndex + Chroma ingest with Qwen3-4B                               |         |
+| OpenRouter summarize & approve workflow CLI                            |         |
+| Chroma RAG local query & LLM synthesis CLI                             |         |
 
 Stack: Docling primary, Marker GPU fallback → `markdown/{slug}/` → Qwen3-4B → Chroma → query/summarize.
 
@@ -117,6 +119,12 @@ papers/*.pdf
 
 **Skills:** `.cursor/skills/ingest-paper`, `summarize-paper`, `approve-summary`, `query-literature` (synthesize skills TBD).
 
+**Component Roles & Purpose:**
+
+- **Chroma Vector DB (RAG):** Manages split text chunks for granular, passage-level retrieval (e.g., retrieving exact formulas or parameters).
+- **Paper Summaries (`summaries/`):** Lightweight markdown files designed to fit easily inside the LLM's context window. They provide high-level summaries of methodology, limitations, and relevance for global reasoning.
+- **Thematic Syntheses (`syntheses/`):** Aggregates summaries by topic to trace cross-paper evidence, support core claims, and identify literature gaps.
+
 ---
 
 ## 6. Implementation queue
@@ -127,13 +135,13 @@ Priority order for upcoming work. Mark items `[x]` when done; add new items at t
 | --- | ---------------------------------------------------------- | ----------- | ----------------------- |
 | 1   | Implement PDF convert (Docling + Marker QA)                | literature  | [x]                     |
 | 2   | LlamaIndex + Chroma ingest with Qwen3-4B                   | literature  | [x]                     |
-| 3   | `fedmaq-lit` summarize + approve + OpenRouter              | literature  | [ ]                     |
+| 3   | `fedmaq-lit` summarize + approve + OpenRouter              | literature  | [x]                     |
 | 4   | Phase 1 FL environment (data partition, bandwidth, Flower) | experiments | [ ]                     |
 | 5   | FedAvg baseline in `src/fedmaq/baselines/`                 | experiments | [ ]                     |
 | 6   | WandB + Hydra ingest utilities                             | analyses    | [ ]                     |
 | 7   | Manuscript `.cursor/` stub                                 | manuscript  | [ ] (blocked: template) |
 
-**Current focus:** P3 — `fedmaq-lit` summarize + approve + OpenRouter (`fedmaq-literature`).
+**Current focus:** P4 — Phase 1 FL environment (data partition, bandwidth, Flower) (`fedmaq-experiments`).
 
 ---
 
@@ -180,6 +188,24 @@ Create `.env` locally (gitignored); document new vars here when added.
 ## 10. Changelog
 
 Reverse chronological. Agents append one entry per session when using `agent-handoff` skill.
+
+### 2026-06-22 — CLI summarize, approve, query commands implemented
+
+- Created `.env.copy` templates for environment configuration across repos.
+- Added `update_registry_summary` function in `registry.py`.
+- Configured OpenRouter client with DeepSeek models (`deepseek/deepseek-v4-flash` for summaries, `deepseek/deepseek-v4-pro` for synthesis queries).
+- Implemented `fedmaq-lit summarize` command to generate draft markdown summaries under `summaries/drafts/`.
+- Implemented `fedmaq-lit approve` command to promote draft summaries to `summaries/`.
+- Implemented `fedmaq-lit query` command to retrieve local Chroma context and synthesize answers.
+- Added 21 total tests passing in pytest (including `test_workflows.py`).
+
+### 2026-06-22 — Literature Batch Ingestion Execution
+
+- Executed literature RAG ingestion for all 29 papers using `uv run fedmaq-lit ingest --all`.
+- Verified GPU utilization at 100% and memory at ~7.6GB / 8.1GB (GeForce RTX 5060) during the 6h 42m run.
+- Confirmed all 29 papers are successfully chunked, embedded, and stored in Chroma DB.
+- Updated `paper_registry.md` to mark all papers as `ready` in the `Indexing` column.
+- Ensured all tests pass (`pytest` 17 passed).
 
 ### 2026-06-22 — Literature RAG Ingestion Pipeline with ChromaDB
 
