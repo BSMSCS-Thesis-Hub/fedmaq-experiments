@@ -115,13 +115,16 @@ papers/*.pdf
 
 **Embedding:** `FEDMAQ_EMBED_MODEL=Qwen/Qwen3-Embedding-4B`, fallback `0.6B`, batch size 4–8. Query instruct in `src/fedmaq_literature/ingest/__init__.py`.
 
+**LLM Models (OpenRouter):** Use `deepseek/deepseek-v4-flash` for drafting summaries. Always use `deepseek/deepseek-v4-pro` for automated reviews, verification runs, and global thematic syntheses to ensure mathematical correctness.
+
 **GPU (RTX 5060 8GB):** Do not run Docling/Marker and 4B embedder concurrently.
 
 > [!IMPORTANT]
 > **Expected Execution Runtimes:**
 >
 > - **Full PDF to Markdown Conversion (Docling + Marker QA):** ~6.5 to 7 hours total. Avoid re-running conversions from scratch unless necessary.
-> - **Full RAG Ingestion & Embedding (Qwen3-Embedding-4B):** ~15 to 30 minutes per paper on CUDA GPU (RTX 5060). Standard output may buffer during the batch embedding pipeline, so check progress by checking `nvidia-smi` GPU utilization or `storage/chroma/chroma.sqlite3` file growth.
+> - **Full RAG Ingestion & Embedding (Qwen3-Embedding-4B):** ~14 minutes per paper on CUDA GPU (RTX 5060) (total ~6.8 hours for 29 papers). Ingestion is run sequentially in a loop to provide real-time visibility, log updates, and incremental SQLite commits.
+> - **Paper Summarization (DeepSeek-v4-Flash via OpenRouter):** ~20 to 25 seconds per paper.
 
 **Skills:** `.cursor/skills/ingest-paper`, `summarize-paper`, `approve-summary`, `query-literature` (synthesize skills TBD).
 
@@ -146,6 +149,11 @@ Priority order for upcoming work. Mark items `[x]` when done; add new items at t
 | 5   | FedAvg baseline in `src/fedmaq/baselines/`                 | experiments | [ ]                     |
 | 6   | WandB + Hydra ingest utilities                             | analyses    | [ ]                     |
 | 7   | Manuscript `.cursor/` stub                                 | manuscript  | [ ] (blocked: template) |
+| 8   | Review & approve remaining 10 draft summaries (remediate)  | literature  | [ ]                     |
+| 9   | Compile/synthesize summaries into thematic syntheses       | literature  | [ ]                     |
+
+> [!TIP]
+> For **Task 8**, the agent should perform the corrections locally by reading the critique files (`summaries/drafts/*_critique.md`) and modifying the draft summaries directly, rather than calling OpenRouter APIs. This keeps the workflow fast and cost-free for the user's OpenRouter account.
 
 **Current focus:** P4 — Phase 1 FL environment (data partition, bandwidth, Flower) (`fedmaq-experiments`).
 
@@ -194,6 +202,13 @@ Create `.env` locally (gitignored); document new vars here when added.
 ## 10. Changelog
 
 Reverse chronological. Agents append one entry per session when using `agent-handoff` skill.
+
+### 2026-06-23 — Sequential Ingestion Refactoring, Math formatting fixes, and Automated Summary Review
+
+- Refactored `fedmaq-lit ingest --all` pipeline to run sequentially in a loop over papers. This preserves memory state but commits after each paper, enabling real-time logging and checkpointing in Chroma DB.
+- Fixed mathematical subscript notation in the LLM system prompt for `fedmaq-lit summarize` to prevent the model from replacing subscripts (`_`) with asterisks (`*`) inside LaTeX math blocks.
+- Created `auto_review.py` script that uses `deepseek-v4-pro` to cross-reference draft summaries against full paper texts, automatically approving 18 drafts and flagging 10 drafts with detailed critiques for correction.
+- Completed comparative study between `deepseek-v4-flash` and `deepseek-v4-pro` as reviewers, demonstrating that Pro has significantly higher symbolic/mathematical accuracy and avoids false approvals.
 
 ### 2026-06-22 — Math loop collapse deduplication and RAG database re-embedding
 
