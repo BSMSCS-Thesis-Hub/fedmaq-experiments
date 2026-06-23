@@ -62,11 +62,6 @@ Output a single markdown code block for the user to paste into the **next** agen
 
 **Last session ({DATE}):** {LAST_SESSION_FOCUS}
 
-**Completed:**
-
-- {bullet 1}
-- {bullet 2}
-
 **Next task:** {NEXT_TASK}
 
 **Primary repo:** `{REPO}`
@@ -82,7 +77,7 @@ Output a single markdown code block for the user to paste into the **next** agen
 **Do not:** parse PDFs in chat; auto-approve literature drafts; duplicate domain rules outside experiments.
 ```
 
-Fill all `{PLACEHOLDERS}` with real content. Add bullets under **Completed** only for work done this session.
+Fill all `{PLACEHOLDERS}` with real content.
 
 ### 4. Confirm to user
 
@@ -102,11 +97,6 @@ After updating the file and emitting the message, tell the user:
 **Thesis:** FedMAQ — communication-efficient FL via multi-adaptive quantization + server-side KD (vision classification: CIFAR/MNIST/FMNIST/FEMNIST).
 
 **Last session (2026-06-18):** Literature PDF conversion scaffold
-
-**Completed:**
-
-- Implemented Docling adapter in `src/fedmaq_literature/convert/docling.py`
-- Added QA heuristics and `meta.yaml` schema
 
 **Next task:** Wire Marker GPU fallback when QA confidence < threshold
 
