@@ -51,9 +51,9 @@ Edit [HANDOFF.md](../../HANDOFF.md):
 
 ### 3. Recommend Handoff
 
-Indicate clearly in your final response whether you recommend handing off to another agent session to obtain clean context.
+Assess whether it is time to hand off to another agent session to obtain clean context.
 
-- **Recommend Handoff** if:
+- **Recommend Handoff** only if:
   - You have completed a major task/implementation phase.
   - The conversation context has grown long/complex (which might cause slower processing or context limits).
   - The active repo or focus is changing significantly.
@@ -66,7 +66,7 @@ Indicate clearly in your final response whether you recommend handing off to ano
 After updating the file, tell the user:
 
 1. `HANDOFF.md` was updated (mention sections touched).
-2. Your recommendation on whether they should hand off to a new agent session for clean context.
+2. **If and only if** you recommend a handoff: state the recommendation and rationale clearly. If no handoff is recommended, do not mention handoff recommendations in your response.
 3. Optional: commit HANDOFF.md with their other changes.
 
 ## Related files
