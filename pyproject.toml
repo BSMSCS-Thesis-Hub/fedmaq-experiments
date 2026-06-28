@@ -46,6 +46,9 @@ flwr-version-target = "1.31.0"
 serverapp = "fedmaq.phase1_env.server:app"
 clientapp = "fedmaq.phase1_env.client:app"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [[tool.uv.index]]
 name = "pytorch-cu132"
 url = "https://download.pytorch.org/whl/cu132"
