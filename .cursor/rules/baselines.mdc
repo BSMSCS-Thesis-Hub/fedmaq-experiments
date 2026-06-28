@@ -8,12 +8,11 @@ alwaysApply: false
 
 Implement under `src/fedmaq/baselines/` and track in `.cursor/project/baseline_registry.md`:
 
-| Group | Algorithms |
-| ----- | ---------- |
-| Vanilla floor | FedAvg, FedProx |
-| Static compression | DAdaQuant, FedPAQ |
-| Pure KD ablation | FedKD, FedDistill |
-| Adaptive / bandwidth-aware | AdaGQ, LAQ-HC |
-| Quantization + KD (SOTA targets) | DynFed, AdaDQ-KD, FedDT |
+| Group             | Algorithms        |
+| ----------------- | ----------------- |
+| Seminal Controls  | FedAvg, FedProx   |
+| Pure Quantization | FedPAQ, DAdaQuant |
+| Pure KD           | FedMD, FedDistill |
+| Hybrid Q+KD       | FedKD, CFD        |
 
 Update `baseline_registry.md` when adding or porting a baseline.

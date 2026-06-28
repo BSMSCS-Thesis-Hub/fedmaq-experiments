@@ -2,12 +2,12 @@
 
 Living document for agent-to-agent and session-to-session continuity across the FedMAQ thesis multi-repo workspace.
 
-| Field                  | Value                                      |
-| ---------------------- | ------------------------------------------ |
-| **Last updated**       | 2026-06-25                                 |
-| **Last session focus** | Narrow down baselines to 8 SOTA algorithms |
-| **Active repo**        | fedmaq-experiments                         |
-| **Blockers**           | None                                       |
+| Field                  | Value                                             |
+| ---------------------- | ------------------------------------------------- |
+| **Last updated**       | 2026-06-28                                        |
+| **Last session focus** | SOTA baseline alignment and dependency resolution |
+| **Active repo**        | fedmaq-experiments                                |
+| **Blockers**           | None                                              |
 
 ---
 
@@ -208,6 +208,16 @@ Create `.env` locally (gitignored); document new vars here when added.
 
 ## 10. Changelog
 
+### 2026-06-28 — SOTA baseline alignment and dependency resolution
+
+- Re-aligned the target baseline suite to match the revised manuscript (Chapters 1–4): Seminal Controls (FedAvg, FedProx), Pure Quantization (FedPAQ, DAdaQuant), Pure KD (FedMD, FedDistill), and Hybrid Q+KD (FedKD, CFD).
+- Excluded unreleased/non-reproducible conceptual competitors (DynFed, FedDT, AdaDQ-KD, LAQ-HC).
+- Deleted obsolete configuration files for `dynfed`, `feddt`, and `laq_hc` under `conf/algorithm/`.
+- Created new algorithm configurations for `fedpaq.yaml`, `feddistill.yaml`, and `cfd.yaml`.
+- Integrated `torch` and `torchvision` dependencies (using CUDA 13.2 wheels index) in `pyproject.toml` to fix unit test collection, executing `uv sync` to update the lock file.
+- Updated baseline and paper registries in both `experiments` and `literature` workspaces.
+- Verified clean execution of the test suite via `pytest`.
+
 ### 2026-06-25 — Baselines narrowed to 8 active SOTA algorithms
 
 - Streamlined the thesis scope by narrowing down from 11 baselines to 8 active baselines: FedAvg, FedProx, DAdaQuant, LAQ-HC, FedMD, FedKD, DynFed, and FedDT.
@@ -242,82 +252,6 @@ Create `.env` locally (gitignored); document new vars here when added.
 - Configured `.cursor/rules/` stubs in the `fedmaq-manuscript` repository (`thesis-context.mdc`, `latex_rules.mdc`, and `repo-preferences.mdc`).
 - Swapped slides preparation and proposal defense/revision rows to match an April 2027 defense timeline.
 - Verified successful LaTeX compilation using `pdflatex main.tex`.
-
-### 2026-06-23 — Sequential Ingestion Refactoring, Math formatting fixes, and Automated Summary Review
-
-- Refactored `fedmaq-lit ingest --all` pipeline to run sequentially in a loop over papers. This preserves memory state but commits after each paper, enabling real-time logging and checkpointing in Chroma DB.
-- Fixed mathematical subscript notation in the LLM system prompt for `fedmaq-lit summarize` to prevent the model from replacing subscripts (`_`) with asterisks (`*`) inside LaTeX math blocks.
-- Created `auto_review.py` script that uses `deepseek-v4-pro` to cross-reference draft summaries against full paper texts, automatically approving 18 drafts and flagging 10 drafts with detailed critiques for correction.
-- Completed comparative study between `deepseek-v4-flash` and `deepseek-v4-pro` as reviewers, demonstrating that Pro has significantly higher symbolic/mathematical accuracy and avoids false approvals.
-
-### 2026-06-22 — Math loop collapse deduplication and RAG database re-embedding
-
-- Identified layout/OCR model loop collapse (repetitive `\quad \text {to}`, `\quad \text {to be}`, `\ ` spaces, etc.) in 13 converted papers that corrupted RAG retrieval.
-- Implemented `deduplicate_math` inside `_clean_math_block` to clean loop collapses, strip empty math blocks, and normalize spacing specifically within math blocks without affecting markdown tables.
-- Ran cleanup across the entire converted markdown corpus and validated that 13 papers were cleaned successfully.
-- Reverted/cleaned existing Chroma vector storage and launched a full CUDA re-embedding task (`uv run fedmaq-lit ingest --all`) on Qwen3-Embedding-4B in FP16 precision.
-
-### 2026-06-22 — CLI summarize, approve, query commands implemented
-
-- Created `.env.copy` templates for environment configuration across repos.
-- Added `update_registry_summary` function in `registry.py`.
-- Configured OpenRouter client with DeepSeek models (`deepseek/deepseek-v4-flash` for summaries, `deepseek/deepseek-v4-pro` for synthesis queries).
-- Implemented `fedmaq-lit summarize` command to generate draft markdown summaries under `summaries/drafts/`.
-- Implemented `fedmaq-lit approve` command to promote draft summaries to `summaries/`.
-- Implemented `fedmaq-lit query` command to retrieve local Chroma context and synthesize answers.
-- Added 21 total tests passing in pytest (including `test_workflows.py`).
-
-### 2026-06-22 — Literature Batch Ingestion Execution
-
-- Executed literature RAG ingestion for all 29 papers using `uv run fedmaq-lit ingest --all`.
-- Verified GPU utilization at 100% and memory at ~7.6GB / 8.1GB (GeForce RTX 5060) during the 6h 42m run.
-- Confirmed all 29 papers are successfully chunked, embedded, and stored in Chroma DB.
-- Updated `paper_registry.md` to mark all papers as `ready` in the `Indexing` column.
-- Ensured all tests pass (`pytest` 17 passed).
-
-### 2026-06-22 — Literature RAG Ingestion Pipeline with ChromaDB
-
-- Implemented LlamaIndex IngestionPipeline with ChromaVectorStore persisting to `storage/chroma`.
-- Configured Qwen3-4B embedding model support with automated CUDA detection and `torch.float16` data type initialization.
-- Added explicit CUDA 13.2 wheels for `torch` and `torchvision` to `pyproject.toml` tool configuration to ensure `uv` builds a GPU-capable environment.
-- Implemented smart CLI skipping: PDF-to-Markdown conversion is now skipped automatically if the paper is already marked ready and the converted markdown file exists.
-- Added `--device` flag to explicitly target CPU or GPU and added a fail-safe that warns and aborts if CUDA is missing when trying to run heavy GPU models.
-- Added unit tests in `tests/test_ingest.py` verifying document formatting, metadata parsing, and Chroma database deduplication.
-
-### 2026-06-21 — Literature paper registration and batch conversion
-
-- Registered all 16 unmatched PDFs under `papers/` in `paper_registry.md` using derived slugs, labels, and tags.
-- Fixed existing mismatched PDF labels (e.g. `liu-2023-adagq`, `jimenez-2024-non-iid-survey`, `qin-2025-kd-survey`) to enable correct matching and resolution.
-- Updated `cli.py` to support batch conversion of all pending papers via a new `--all` command flag.
-- Created `tests/test_cli.py` to test the new batch-convert CLI argument parser features.
-- Completed the batch-convert job and successfully reattempted and converted the failed `richter-2024-electric-load` paper, marking all 29 papers as `ready` in the registry.
-- Analyzed KaTeX parsing/rendering errors in Docling outputs (layout boundary overlaps, transformer generation loop collapses, multiline bracket mismatches) and decided to ignore them because they do not impact downstream RAG or LLM comprehension.
-
-### 2026-06-21 — Literature math cleanup and lint exclusion
-
-- Addressed KaTeX parse errors due to alignment characters (`&` or `\\`) not being wrapped.
-- Improved `_clean_math_block` to strip `equation`/`equation*` wrappers (with optional labels) to avoid nested environment errors.
-- Enhanced `_post_process_markdown` to detect and convert aligned/multiline inline math (`$...$`) into block math wrapped in `aligned`.
-- Added unit tests in `test_pipeline.py` to verify the stripping, wrapping, and inline conversion logic.
-- Created `.markdownlintignore` to exclude the generated `markdown/` directory from lints and deleted redundant `.markdownlint.json`.
-- Regenerated `hinton-2015-distillation` markdown successfully with all equations rendered clean.
-
-### 2026-06-19 — Literature PDF convert pipeline
-
-- Implemented Docling primary + Marker GPU fallback in `src/fedmaq_literature/convert/`.
-- Added QA using Docling confidence grades and content heuristics; writes `markdown/{slug}/paper.md` + `meta.yaml`.
-- Wired `fedmaq-lit convert`, `ingest --convert-only`, `list-slugs`; registry auto-updates conversion status.
-- Added unit tests (registry, QA, pipeline write); Windows HF symlink workaround in Docling adapter.
-- Smoke-tested convert on `hinton-2015-distillation` (Docling, QA passed).
-
-### 2026-06-18 — Workspace scaffold
-
-- Created `.cursor/` structure across experiments, literature, analyses, presentations.
-- Decomposed `context.md` into experiments `.mdc` rules.
-- Scaffolded uv monorepos, literature CLI stub, analyses data layout.
-- Migrated presentations `.agents/` → `.cursor/`; aligned metadata to FedMAQ.
-- Added README + AGENTS.md per repo.
-- Created this `HANDOFF.md` and `agent-handoff` skill.
 
 ---
 
