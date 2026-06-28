@@ -1,8 +1,9 @@
 # Project-specific paths
 data/
 .data_partitions/
-outputs/
 multirun/
+outputs/
+references/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
