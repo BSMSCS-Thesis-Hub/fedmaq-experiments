@@ -19,8 +19,12 @@ TRANSFORMS = {
     "mnist": transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     ),
-    "fmnist": transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]),
-    "femnist": transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]),
+    "fmnist": transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+    ),
+    "femnist": transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+    ),
     "cifar10": transforms.Compose(
         [
             transforms.ToTensor(),
@@ -42,9 +46,13 @@ def load_dataset(dataset_name: str, train: bool = True) -> Dataset:
     name_lower = dataset_name.lower()
 
     if name_lower == "mnist":
-        return MNIST(DATA_DIR, train=train, download=True, transform=TRANSFORMS["mnist"])
+        return MNIST(
+            DATA_DIR, train=train, download=True, transform=TRANSFORMS["mnist"]
+        )
     elif name_lower == "fmnist":
-        return FashionMNIST(DATA_DIR, train=train, download=True, transform=TRANSFORMS["fmnist"])
+        return FashionMNIST(
+            DATA_DIR, train=train, download=True, transform=TRANSFORMS["fmnist"]
+        )
     elif name_lower == "femnist":
         # FEMNIST is approximated via EMNIST with 'byclass' split
         return EMNIST(
@@ -55,9 +63,13 @@ def load_dataset(dataset_name: str, train: bool = True) -> Dataset:
             transform=TRANSFORMS["femnist"],
         )
     elif name_lower in ["cifar10", "cifar-10"]:
-        return CIFAR10(DATA_DIR, train=train, download=True, transform=TRANSFORMS["cifar10"])
+        return CIFAR10(
+            DATA_DIR, train=train, download=True, transform=TRANSFORMS["cifar10"]
+        )
     elif name_lower in ["cifar100", "cifar-100"]:
-        return CIFAR100(DATA_DIR, train=train, download=True, transform=TRANSFORMS["cifar100"])
+        return CIFAR100(
+            DATA_DIR, train=train, download=True, transform=TRANSFORMS["cifar100"]
+        )
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
 
@@ -82,7 +94,7 @@ def generate_partition_indices(
     dataset_name: str,
     num_clients: int,
     alpha: float,
-    num_public_samples: int = 500,
+    num_public_samples: int = 200,
     seed: int = 42,
 ) -> tuple[list[int], dict[str, list[int]]]:
     """Generate or retrieve cached partition indices (deterministic).
@@ -164,7 +176,9 @@ def get_client_loader(
     dataset = load_dataset(dataset_name, train=train)
     indices = client_indices_dict[str(client_id)]
     client_subset = Subset(dataset, indices)
-    return torch.utils.data.DataLoader(client_subset, batch_size=batch_size, shuffle=train)
+    return torch.utils.data.DataLoader(
+        client_subset, batch_size=batch_size, shuffle=train
+    )
 
 
 def get_server_loaders(
@@ -173,9 +187,13 @@ def get_server_loaders(
     """Return public unlabeled server dataset loader and central evaluation test loader."""
     train_dataset = load_dataset(dataset_name, train=True)
     public_subset = Subset(train_dataset, public_indices)
-    public_loader = torch.utils.data.DataLoader(public_subset, batch_size=batch_size, shuffle=False)
+    public_loader = torch.utils.data.DataLoader(
+        public_subset, batch_size=batch_size, shuffle=False
+    )
 
     test_dataset = load_dataset(dataset_name, train=False)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
 
     return public_loader, test_loader

@@ -145,7 +145,7 @@ class NetworkSimulator:
         epochs: int,
         alg_name: str,
         public_epochs: int = 5,
-        num_public: int = 500,
+        num_public: int = 200,
     ) -> tuple[float, float, float]:
         """Return (t_download, t_train, t_upload) for a single client."""
         # Speed in bytes per second (from Mbps)

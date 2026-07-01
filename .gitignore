@@ -5,6 +5,13 @@ multirun/
 outputs/
 references/
 
+# Weights & Biases
+wandb/
+
+# Local experiment telemetry logs
+experiment_log.csv
+experiment_log.jsonl
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
