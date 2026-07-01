@@ -1,12 +1,14 @@
-# General experimental hyperparameters (aligned with chapter_4.tex)
+# General experimental hyperparameters (aligned with chapter_4.tex Table 4.1)
+# For fast CI / testing runs, use: +experiment=ci  (overrides total_rounds and num_clients)
 num_clients: 10
-batch_size: 64
-local_epochs: 5
-learning_rate: 0.01
-rho: 0.99               # Weight Decay / Momentum
-client_fraction: 0.1    # Fraction per round (10%)
-total_rounds: 2        # R (2 rounds for preliminary metrics)
-num_public_samples: 500 # Server public slice size
+batch_size: 64            # B
+local_epochs: 5           # E
+learning_rate: 0.01       # eta
+weight_decay: 0.0         # separate from momentum; tune per experiment
+momentum: 0.9             # rho (SGD momentum, aligned with FL literature)
+client_fraction: 0.1      # C (10% per round)
+total_rounds: 100         # R per manuscript §4.3, Table 4.1
+num_public_samples: 200   # |D_pub| per manuscript §4.3, Table 4.1
 
 # Bandwidth and Compute heterogeneity settings
 heterogeneity:

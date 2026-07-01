@@ -7,7 +7,6 @@ import flwr as fl
 import hydra
 import numpy as np
 import torch
-import torch.nn as nn
 from flwr.clientapp import ClientApp
 from flwr.common import Scalar, ndarrays_to_parameters
 from flwr.server import ServerAppComponents, ServerConfig
@@ -21,6 +20,7 @@ from fedmaq.core.client import (
     GenericClient,
     LossHook,
 )
+from fedmaq.core.evaluation import evaluate_fedmd_ensemble, evaluate_global_model
 from fedmaq.core.models import (
     DEVICE,
     get_kd_student_model,
@@ -48,33 +48,6 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-def compute_precision_recall_f1(
-    all_preds: np.ndarray, all_labels: np.ndarray, num_classes: int = 10
-) -> tuple[float, float, float]:
-    """Calculate macro-averaged Precision, Recall, and F1-score."""
-    precision_list = []
-    recall_list = []
-    f1_list = []
-    for c in range(num_classes):
-        tp = np.sum((all_preds == c) & (all_labels == c))
-        fp = np.sum((all_preds == c) & (all_labels != c))
-        fn = np.sum((all_preds != c) & (all_labels == c))
-
-        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = (2 * prec * rec) / (prec + rec) if (prec + rec) > 0 else 0.0
-
-        precision_list.append(prec)
-        recall_list.append(rec)
-        f1_list.append(f1)
-
-    return (
-        float(np.mean(precision_list)),
-        float(np.mean(recall_list)),
-        float(np.mean(f1_list)),
-    )
 
 
 @hydra.main(config_path="../conf", config_name="config", version_base="1.3")
@@ -138,7 +111,10 @@ def main(cfg: DictConfig) -> None:
         elif cfg.algorithm.name in ["dadaquant", "fedmaq"]:
             from fedmaq.baselines.quantization import DAdaQuantCompressionHook
 
-            compressor_hook = DAdaQuantCompressionHook(q=int(cfg.algorithm.q_min))
+            compressor_hook = DAdaQuantCompressionHook(
+                q=int(cfg.algorithm.q_min),
+                rng=np.random.default_rng(cfg.seed),
+            )
         elif cfg.algorithm.name == "fedkd":
             from fedmaq.baselines.compression import FedKDCompressionHook
 
@@ -161,7 +137,9 @@ def main(cfg: DictConfig) -> None:
     def server_fn(context: fl.app.Context) -> ServerAppComponents:
         # Instantiate global model for initialization
         if cfg.algorithm.name in ["fedkd", "fedmaq"]:
-            global_model = get_kd_student_model(cfg.dataset.name, cfg.dataset.num_classes)
+            global_model = get_kd_student_model(
+                cfg.dataset.name, cfg.dataset.num_classes
+            )
         else:
             global_model = get_model(cfg.dataset.name, cfg.dataset.num_classes)
 
@@ -176,10 +154,9 @@ def main(cfg: DictConfig) -> None:
         def evaluate_fn(
             server_round: int,
             parameters: fl.common.NDArrays,
-            config: dict[str, Scalar],
         ) -> tuple[float, dict[str, Scalar]] | None:
-            device = DEVICE
-            criterion = nn.CrossEntropyLoss()
+            device_str = OmegaConf.select(cfg, "device", default=None)
+            device = torch.device(device_str) if device_str else DEVICE
 
             if cfg.algorithm.name == "fedmd":
                 from pathlib import Path
@@ -188,156 +165,36 @@ def main(cfg: DictConfig) -> None:
                     "persistence_dir", f".data_partitions/{cfg.algorithm.name}_models"
                 )
                 model_dir = Path(persistence_dir)
-                client_paths = list(model_dir.glob("client_*.pth")) if model_dir.exists() else []
+                client_paths = (
+                    list(model_dir.glob("client_*.pth")) if model_dir.exists() else []
+                )
 
                 if not client_paths:
                     # Fallback to random global model if no client models are saved yet
-                    global_model.eval()
-                    global_model.to(device)
-                    loss_sum = 0.0
-                    correct = 0
-                    total = 0
-                    all_preds = []
-                    all_labels = []
-                    with torch.no_grad():
-                        for images, labels in test_loader:
-                            images, labels = images.to(device), labels.to(device)
-                            outputs = global_model(images)
-                            loss_sum += criterion(outputs, labels).item() * len(labels)
-                            _, predicted = torch.max(outputs.data, 1)
-                            total += labels.size(0)
-                            correct += (predicted == labels).sum().item()
-                            all_preds.append(predicted.cpu().numpy())
-                            all_labels.append(labels.cpu().numpy())
-                    loss = loss_sum / total if total > 0 else 0.0
-                    accuracy = correct / total if total > 0 else 0.0
-                    if len(all_preds) > 0:
-                        preds_concat = np.concatenate(all_preds)
-                        labels_concat = np.concatenate(all_labels)
-                        precision, recall, f1 = compute_precision_recall_f1(
-                            preds_concat,
-                            labels_concat,
-                            num_classes=cfg.dataset.num_classes,
-                        )
-                    else:
-                        precision, recall, f1 = 0.0, 0.0, 0.0
-                    return loss, {
-                        "accuracy": accuracy,
-                        "precision": precision,
-                        "recall": recall,
-                        "f1": f1,
-                    }
+                    return evaluate_global_model(
+                        global_model,
+                        test_loader,
+                        num_classes=cfg.dataset.num_classes,
+                        device=device,
+                    )
 
-                # Evaluate each client model and average results
-                total_loss = 0.0
-                total_accuracy = 0.0
-                total_precision = 0.0
-                total_recall = 0.0
-                total_f1 = 0.0
-                num_eval_clients = 0
-
-                for path in client_paths:
-                    client_model = get_model(cfg.dataset.name, cfg.dataset.num_classes)
-                    try:
-                        client_model.load_state_dict(torch.load(path, map_location=device))
-                        client_model.eval()
-                        client_model.to(device)
-
-                        loss_sum = 0.0
-                        correct = 0
-                        total = 0
-                        all_preds = []
-                        all_labels = []
-                        with torch.no_grad():
-                            for images, labels in test_loader:
-                                images, labels = images.to(device), labels.to(device)
-                                outputs = client_model(images)
-                                loss_sum += criterion(outputs, labels).item() * len(labels)
-                                _, predicted = torch.max(outputs.data, 1)
-                                total += labels.size(0)
-                                correct += (predicted == labels).sum().item()
-                                all_preds.append(predicted.cpu().numpy())
-                                all_labels.append(labels.cpu().numpy())
-
-                        client_loss = loss_sum / total if total > 0 else 0.0
-                        client_acc = correct / total if total > 0 else 0.0
-                        if len(all_preds) > 0:
-                            preds_concat = np.concatenate(all_preds)
-                            labels_concat = np.concatenate(all_labels)
-                            client_prec, client_rec, client_f1 = compute_precision_recall_f1(
-                                preds_concat,
-                                labels_concat,
-                                num_classes=cfg.dataset.num_classes,
-                            )
-                        else:
-                            client_prec, client_rec, client_f1 = 0.0, 0.0, 0.0
-
-                        total_loss += client_loss
-                        total_accuracy += client_acc
-                        total_precision += client_prec
-                        total_recall += client_rec
-                        total_f1 += client_f1
-                        num_eval_clients += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to load or evaluate model at {path}: {e}")
-
-                if num_eval_clients > 0:
-                    loss = total_loss / num_eval_clients
-                    accuracy = total_accuracy / num_eval_clients
-                    precision = total_precision / num_eval_clients
-                    recall = total_recall / num_eval_clients
-                    f1 = total_f1 / num_eval_clients
-                else:
-                    loss, accuracy, precision, recall, f1 = 0.0, 0.0, 0.0, 0.0, 0.0
-
-                return loss, {
-                    "accuracy": accuracy,
-                    "precision": precision,
-                    "recall": recall,
-                    "f1": f1,
-                }
+                return evaluate_fedmd_ensemble(
+                    client_paths=client_paths,
+                    dataset_name=cfg.dataset.name,
+                    num_classes=cfg.dataset.num_classes,
+                    test_loader=test_loader,
+                    device=device,
+                )
 
             # Default FL path (FedAvg, FedProx, FedMAQ, etc.)
             # Load weights
             set_model_parameters(global_model, parameters)
-
-            global_model.eval()
-            global_model.to(device)
-
-            loss_sum = 0.0
-            correct = 0
-            total = 0
-            all_preds = []
-            all_labels = []
-
-            with torch.no_grad():
-                for images, labels in test_loader:
-                    images, labels = images.to(device), labels.to(device)
-                    outputs = global_model(images)
-                    loss_sum += criterion(outputs, labels).item() * len(labels)
-                    _, predicted = torch.max(outputs.data, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    all_preds.append(predicted.cpu().numpy())
-                    all_labels.append(labels.cpu().numpy())
-
-            loss = loss_sum / total if total > 0 else 0.0
-            accuracy = correct / total if total > 0 else 0.0
-            if len(all_preds) > 0:
-                preds_concat = np.concatenate(all_preds)
-                labels_concat = np.concatenate(all_labels)
-                precision, recall, f1 = compute_precision_recall_f1(
-                    preds_concat, labels_concat, num_classes=cfg.dataset.num_classes
-                )
-            else:
-                precision, recall, f1 = 0.0, 0.0, 0.0
-
-            return loss, {
-                "accuracy": accuracy,
-                "precision": precision,
-                "recall": recall,
-                "f1": f1,
-            }
+            return evaluate_global_model(
+                global_model,
+                test_loader,
+                num_classes=cfg.dataset.num_classes,
+                device=device,
+            )
 
         # Setup custom strategy
         strategy = TelemetryFedAvg(

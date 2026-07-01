@@ -928,3 +928,107 @@ def test_fedmaq_simulation_dry_run(mock_dataset, tmp_path, monkeypatch):
     finally:
         if persistence_dir.exists():
             shutil.rmtree(persistence_dir)
+
+
+def test_compute_fedmaq_q_k_t():
+    """Test FedMAQ quantization helper formulas."""
+    from fedmaq.core.strategy import compute_fedmaq_q_k_t
+
+    # Test formulation 1: Linear Sum
+    q = compute_fedmaq_q_k_t(
+        c_k=4096.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=1,
+        q_min=2,
+        q_max=8,
+        gamma1=0.5,
+        gamma2=0.5,
+    )
+    # tilde_g = 0.5, tilde_n = 0.5. term = 0.25 + 0.25 = 0.5. q_hat = 2 + round(6 * 0.5) = 5.
+    # Q_max_capped = floor(4096/2048) = 2. So Q should be min(2, 5) = 2.
+    assert q == 2
+
+    # If c_k is large enough:
+    q = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=1,
+        q_min=2,
+        q_max=8,
+        gamma1=0.5,
+        gamma2=0.5,
+    )
+    assert q == 5
+
+
+def test_compute_dadaquant_client_q():
+    """Test DAdaQuant client-adaptive quantization helper."""
+    from fedmaq.core.strategy import compute_dadaquant_client_q
+
+    sizes = [100, 200]
+    q_t = 4
+    q_is = compute_dadaquant_client_q(sizes, q_t)
+    assert len(q_is) == 2
+    # Client with larger dataset (index 1) should have greater or equal q_i.
+    assert q_is[1] >= q_is[0]
+
+
+def test_network_simulator():
+    """Test NetworkSimulator delay calculation."""
+    import numpy as np
+
+    from fedmaq.core.strategy import NetworkSimulator
+
+    upload_bw = np.array([10.0])  # 10 Mbps
+    download_bw = np.array([20.0])  # 20 Mbps
+    comp_speed = np.array([100.0])  # 100 samples/sec
+
+    sim = NetworkSimulator(upload_bw, download_bw, comp_speed, num_clients=1)
+
+    t_download, t_train, t_upload = sim.simulate_client_delay(
+        cid=0,
+        model_size_bytes=1000000,  # 1 MB
+        bytes_uploaded=500000,  # 0.5 MB
+        num_samples=200,
+        epochs=5,
+        alg_name="fedavg",
+    )
+
+    # 1 MB download on 20 Mbps link:
+    # 20 Mbps = 2.5 MB/s. 1 MB / 2.5 MB/s = 0.4s.
+    assert abs(t_download - 0.4) < 1e-5
+
+    # 0.5 MB upload on 10 Mbps link:
+    # 10 Mbps = 1.25 MB/s. 0.5 MB / 1.25 MB/s = 0.4s.
+    assert abs(t_upload - 0.4) < 1e-5
+
+    # 200 samples * 5 epochs = 1000 samples. 1000 samples / 100 samples/sec = 10s.
+    assert abs(t_train - 10.0) < 1e-5
+
+
+def test_evaluation_metrics():
+    """Test compute_precision_recall_f1 helper."""
+    import numpy as np
+
+    from fedmaq.core.evaluation import compute_precision_recall_f1
+
+    all_preds = np.array([0, 1, 0, 1])
+    all_labels = np.array([0, 1, 1, 0])
+    precision, recall, f1 = compute_precision_recall_f1(
+        all_preds, all_labels, num_classes=2
+    )
+
+    # Class 0: tp=1, fp=1, fn=1. prec=0.5, rec=0.5, f1=0.5.
+    # Class 1: tp=1, fp=1, fn=1. prec=0.5, rec=0.5, f1=0.5.
+    # Macro avg: prec=0.5, rec=0.5, f1=0.5.
+    assert abs(precision - 0.5) < 1e-5
+    assert abs(recall - 0.5) < 1e-5
+    assert abs(f1 - 0.5) < 1e-5

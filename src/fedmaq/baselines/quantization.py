@@ -69,15 +69,19 @@ class FedPAQCompressionHook(CompressionHook):
 class DAdaQuantCompressionHook(CompressionHook):
     """Doubly-adaptive quantization hook implementing DAdaQuant's client-side quantizer."""
 
-    def __init__(self, q: int = 8) -> None:
+    def __init__(self, q: int = 8, rng: np.random.Generator | None = None) -> None:
         """Initialize the compression hook.
 
         Parameters
         ----------
         q : int
             Quantization level (default: 8).
+        rng : np.random.Generator | None
+            Seeded NumPy random generator for reproducible stochastic rounding.
+            If None, a default (unseeded) generator is used.
         """
         self.q = q
+        self.rng = rng if rng is not None else np.random.default_rng()
 
     def compress(self, deltas: list[np.ndarray]) -> tuple[list[np.ndarray], int]:
         """Compress deltas using stochastic uniform quantization with self.q bins per sign.
@@ -110,7 +114,7 @@ class DAdaQuantCompressionHook(CompressionHook):
                 # Stochastic rounding
                 floor_val = np.floor(scaled)
                 prob = scaled - floor_val
-                rand_val = np.random.rand(*scaled.shape)
+                rand_val = self.rng.random(scaled.shape)
                 quantized = np.where(rand_val < prob, floor_val + 1, floor_val)
                 # Map back to float32 domain
                 dequantized = (quantized / self.q) * scale

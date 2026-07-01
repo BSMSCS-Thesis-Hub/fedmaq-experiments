@@ -1,0 +1,8 @@
+# @package _global_
+# CI / fast-testing override — NOT for production experiments.
+# Usage: uv run python scripts/run.py +experiment=ci
+# Or via pytest fixtures: overrides=["experiment=default,ci"]
+#
+# Reduces rounds and client count to keep test time < 60 s per algorithm.
+total_rounds: 2
+num_clients: 2

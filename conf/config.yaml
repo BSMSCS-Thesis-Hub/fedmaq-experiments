@@ -11,4 +11,7 @@ hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
+# Default single-run seed. For statistical controls (§4.3), run with all 5:
+#   uv run python scripts/run.py --multirun seed=0,42,123,456,789
+# Canonical seeds: [0, 42, 123, 456, 789]
 seed: 42

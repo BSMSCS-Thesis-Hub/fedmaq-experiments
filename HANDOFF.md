@@ -5,7 +5,7 @@ Living document for agent-to-agent and session-to-session continuity across the 
 | Field                  | Value                                                                    |
 | ---------------------- | ------------------------------------------------------------------------ |
 | **Last updated**       | 2026-07-01                                                               |
-| **Last session focus** | Revised FedMAQ methodology, utility metrics, and local telemetry logging |
+| **Last session focus** | Full manuscript audit (Ch. 1--4) + codebase hardening; all 19 tests pass |
 | **Active repo**        | fedmaq-experiments                                                       |
 | **Blockers**           | None                                                                     |
 
@@ -56,19 +56,21 @@ Living document for agent-to-agent and session-to-session continuity across the 
 
 ## 4. Per-repo status
 
-### fedmaq-experiments — [Phase 1 Env Complete]
+### fedmaq-experiments — [Phase 1 Env Complete; Manuscript Aligned]
 
-| Done                                                            | Pending                       |
-| --------------------------------------------------------------- | ----------------------------- |
-| `pyproject.toml`, codebase structure, `conf/`, tests            | Port remaining SOTA baselines |
-| 11 `.cursor/rules/`, registries, 2 skills                       | (FedDistill, CFD)             |
-| `context.md` deprecation notice                                 | Docker integration            |
-| Phase 1 environment: model factory, partitioning, caching,      |                               |
-| telemetry, client/strategy wrappers, `scripts/run.py`           |                               |
-| Seminal controls (FedAvg, FedProx), pure quantization (FedPAQ,  |                               |
-| DAdaQuant), model distillation (FedMD), hybrid Q+KD (FedKD),    |                               |
-| and revised FedMAQ (task-loss-only client, server distillation) |                               |
-| implementations                                                 |                               |
+| Done                                                           | Pending                       |
+| -------------------------------------------------------------- | ----------------------------- |
+| `pyproject.toml`, codebase structure, `conf/`, tests           | Port remaining SOTA baselines |
+| 11 `.cursor/rules/`, registries, 2 skills                      | (FedDistill, CFD — Sep 2026)  |
+| `context.md` deprecation notice                                | Docker integration            |
+| Phase 1 environment: model factory, partitioning, caching,     |                               |
+| telemetry, client/strategy wrappers, `scripts/run.py`          |                               |
+| Seminal controls (FedAvg, FedProx), pure quantization (FedPAQ, |                               |
+| DAdaQuant), model distillation (FedMD), hybrid Q+KD (FedKD),   |                               |
+| and revised FedMAQ implementations                             |                               |
+| Full manuscript audit (Ch. 1--4); all discrepancies resolved   |                               |
+| Bug fixes: seeded RNG for DAdaQuant, heterogeneous comp speed  |                               |
+| Config hardening: ci.yaml, kd_epochs, uniform_memory.yaml      |                               |
 
 Key paths: `src/fedmaq/core/`, `src/fedmaq/baselines/`, `.cursor/project/baseline_registry.md`
 
@@ -151,22 +153,24 @@ papers/*.pdf
 
 Priority order for upcoming work. Mark items `[x]` when done; add new items at the bottom with date.
 
-| P   | Task                                                       | Repo        | Status                  |
-| --- | ---------------------------------------------------------- | ----------- | ----------------------- |
-| 1   | Implement PDF convert (Docling + Marker QA)                | literature  | [x]                     |
-| 2   | LlamaIndex + Chroma ingest with Qwen3-4B                   | literature  | [x]                     |
-| 3   | `fedmaq-lit` summarize + approve + OpenRouter              | literature  | [x]                     |
-| 4   | Phase 1 FL environment (data partition, bandwidth, Flower) | experiments | [x]                     |
-| 5   | FedAvg / FedProx / FedPAQ / DAdaQuant baselines            | experiments | [x]                     |
-| 6   | WandB + Hydra ingest utilities                             | analyses    | [ ]                     |
-| 7   | Manuscript `.cursor/` stub                                 | manuscript  | [ ] (blocked: template) |
-| 8   | Review & approve remaining 10 draft summaries (remediate)  | literature  | [x]                     |
-| 9   | Compile/synthesize summaries into thematic syntheses       | literature  | [ ]                     |
+| P   | Task                                                       | Repo        | Status |
+| --- | ---------------------------------------------------------- | ----------- | ------ |
+| 1   | Implement PDF convert (Docling + Marker QA)                | literature  | [x]    |
+| 2   | LlamaIndex + Chroma ingest with Qwen3-4B                   | literature  | [x]    |
+| 3   | `fedmaq-lit` summarize + approve + OpenRouter              | literature  | [x]    |
+| 4   | Phase 1 FL environment (data partition, bandwidth, Flower) | experiments | [x]    |
+| 5   | FedAvg / FedProx / FedPAQ / DAdaQuant baselines            | experiments | [x]    |
+| 6   | Full manuscript audit + codebase hardening (Ch. 1--4)      | experiments | [x]    |
+| 7   | WandB + Hydra ingest utilities                             | analyses    | [ ]    |
+| 8   | Review & approve remaining 10 draft summaries (remediate)  | literature  | [x]    |
+| 9   | Compile/synthesize summaries into thematic syntheses       | literature  | [ ]    |
+| 10  | Port FedDistill baseline                                   | experiments | [ ]    |
+| 11  | Port CFD baseline                                          | experiments | [ ]    |
 
 > [!TIP]
 > For **Task 8**, the agent should perform the corrections locally by reading the critique files (`summaries/drafts/*_critique.md`) and modifying the draft summaries directly, rather than calling OpenRouter APIs. This keeps the workflow fast and cost-free for the user's OpenRouter account.
 
-**Current focus:** P6 — WandB + Hydra ingest utilities (`fedmaq-analyses`).
+**Current focus:** P7 — WandB + Hydra ingest utilities (`fedmaq-analyses`). Tasks 10--11 (FedDistill, CFD) are Sep--Oct 2026 per Gantt.
 
 ---
 
@@ -212,14 +216,22 @@ Create `.env` locally (gitignored); document new vars here when added.
 
 ## 10. Changelog
 
-### 2026-07-01 — Code Quality Review and Best Practices Refactoring
+### 2026-07-01 — Full Manuscript Audit (Ch. 1--4) and Codebase Hardening
 
-- Fixed a bug in `FedPAQCompressionHook` where quantization levels were cached at initialization instead of dynamically recomputing when bit-width `q` changed.
-- Centralized device detection and student-teacher model instantiation stubs in `models.py`, eliminating duplicated model factory code in `client.py`, `strategy.py`, and `run.py`.
-- Optimized import structure in `strategy.py` by moving local/dynamic imports to the top level.
-- Robustified dictionary flattening in `TelemetryManager` to support OmegaConf configurations.
-- Executed code cleanup and formatting sweep with Ruff, achieving 100% compliance with PEP 8 and modern Python conventions.
-- Verified all improvements with the full test suite and MNIST simulations.
+**Audit scope:** All four released chapters compared line-by-line against the experiment codebase.
+
+- Identified and fixed 7 issues across config, source, and scripts; all 19 tests continue to pass post-changes.
+- **Bug: heterogeneous compute speed** — `client_comp_speed` was always pinned to `comp_max`; changed to `rng.uniform(comp_min, comp_max)` per §2.2 ("variable CPU frequencies").
+- **Bug: unseeded stochastic rounding** — `DAdaQuantCompressionHook.compress()` used the global `np.random.rand`, breaking reproducibility; replaced with an injectable `np.random.Generator`.
+- **Documented 5 canonical seeds** `[0, 42, 123, 456, 789]` in `conf/config.yaml` with multirun sweep command; `run.py` now passes `np.random.default_rng(cfg.seed)` to the hook (§4.3 statistical controls).
+- **Config separation (CI vs. production):** `conf/experiment/default.yaml` restored to `total_rounds: 100`; new `conf/experiment/ci.yaml` provides `total_rounds: 2` override (`+experiment=ci`).
+- **Dead config removed:** `kd_weight: 0.5` stripped from `fedmaq.yaml`; replaced with `kd_epochs: 1`, `server_kd_lr`, `server_kd_momentum` as explicit, named KD parameters.
+- **Control group config added:** `conf/heterogeneity/uniform_memory.yaml` (8192 MB fixed) for §4.1 ablation; wired into `TelemetryFedAvg.__init__` via `uniform_memory_mb` key.
+- **`run_server_side_kd` gains `epochs` param:** distillation passes over proxy dataset now configurable; body correctly nested inside both epoch and batch loops.
+- **Stale default fixed:** `num_public_samples` hardcoded default in `aggregate_fit` corrected from 500 → 200.
+- **Safe OmegaConf device resolution:** `cfg.get("device", DEVICE)` → `OmegaConf.select(cfg, "device", default=None)` in `evaluate_fn`.
+- **Potential manuscript error flagged:** Table 4.1 `Weight Decay / Momentum ρ = 0.99` conflates two hyperparameters with a numerically suspect value; recommend splitting into `Momentum ρ = 0.9` / `Weight Decay = 0.0`.
+- **FedDistill and CFD confirmed as zero-implementation stubs** — on schedule for Sep--Oct 2026 per Gantt.
 
 ### 2026-07-01 — Revised FedMAQ methodology, auxiliary metrics, and local telemetry logging
 

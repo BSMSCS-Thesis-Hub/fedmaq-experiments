@@ -20,6 +20,7 @@ from flwr.common import (
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg
+from torch.utils.data import DataLoader
 
 from fedmaq.baselines.compression import compress_tensor, decompress_tensor
 from fedmaq.core.models import (
@@ -33,6 +34,179 @@ from fedmaq.core.partitioning import get_client_loader, get_server_loaders
 from fedmaq.core.telemetry import TelemetryManager
 
 logger = logging.getLogger(__name__)
+
+
+def compute_fedmaq_q_k_t(
+    c_k: float,
+    c_unit: float,
+    g_k: float,
+    g_max: float,
+    n_k: int,
+    n_max: int,
+    formulation: int,
+    q_min: int,
+    q_max: int,
+    gamma1: float = 0.5,
+    gamma2: float = 0.5,
+    lambda_val: float = 1.0,
+    tau_g: float = 0.5,
+    tau_n: float = 0.5,
+) -> int:
+    """Compute client-specific quantization bit-width for FedMAQ."""
+    # Normalized signals
+    tilde_g = g_k / g_max if g_max > 0.0 else 0.0
+    tilde_n = n_k / n_max if n_max > 0.0 else 0.0
+
+    # Tier 1 hard cap: Q_max = floor(c_k / c_unit)
+    q_max_capped = int(max(1, np.floor(c_k / c_unit)))
+
+    # Tier 2 soft quality target based on the formulation
+    if formulation == 1:
+        # Alternative 1: Linear Sum
+        term = gamma1 * tilde_g + gamma2 * tilde_n
+        q_hat = q_min + np.round((q_max - q_min) * term)
+    elif formulation == 2:
+        # Alternative 2: Multiplicative
+        term = (tilde_g**gamma1) * (tilde_n**gamma2)
+        q_hat = q_min + np.round((q_max - q_min) * term)
+    elif formulation == 3:
+        # Alternative 3: Gradient-Primary, Data-Modulated
+        modulator = (1.0 + lambda_val * tilde_n) / (1.0 + lambda_val)
+        q_hat = q_min + np.round((q_max - q_min) * tilde_g * modulator)
+    elif formulation == 4:
+        # Alternative 4: Threshold-Based Staged Rule
+        q_mid = int(np.round((q_max + q_min) / 2.0))
+        if tilde_g >= tau_g and tilde_n >= tau_n:
+            q_hat = q_max
+        elif tilde_g >= tau_g or tilde_n >= tau_n:
+            q_hat = q_mid
+        else:
+            q_hat = q_min
+    else:
+        q_hat = q_min
+
+    # Apply constraints: Tier-2 soft quality is bounded by [q_min, q_max]
+    q_hat = int(max(q_min, min(q_max, q_hat)))
+    # Tier-1 hard cap: memory-limited clients may receive fewer bits than q_min.
+    # This is intentional — the physical bound wins over the soft quality target.
+    return int(min(q_max_capped, q_hat))
+
+
+def compute_dadaquant_client_q(
+    sizes: list[int],
+    q_t: int,
+) -> list[int]:
+    """Compute optimal client-adaptive quantization levels for each client in DAdaQuant."""
+    if not sizes:
+        return []
+    total_size = sum(sizes)
+    if total_size == 0:
+        return [q_t] * len(sizes)
+
+    w = [size / total_size for size in sizes]
+    w_pow = [wi ** (2.0 / 3.0) for wi in w]
+    w_sq = [wi**2 for wi in w]
+
+    a = sum(w_pow)
+    b = sum(ws / (q_t**2) for ws in w_sq)
+
+    q_i_list = []
+    for wi, wi_pow in zip(w, w_pow):
+        if b > 0:
+            q_val = np.sqrt(a / b) * wi_pow
+            q_i = int(max(1, np.round(q_val)))
+        else:
+            q_i = q_t
+        q_i_list.append(q_i)
+    return q_i_list
+
+
+class NetworkSimulator:
+    """Simulates communication delays and training delays for FL rounds."""
+
+    def __init__(
+        self,
+        client_upload_bw: np.ndarray,
+        client_download_bw: np.ndarray,
+        client_comp_speed: np.ndarray,
+        num_clients: int,
+    ) -> None:
+        self.client_upload_bw = client_upload_bw
+        self.client_download_bw = client_download_bw
+        self.client_comp_speed = client_comp_speed
+        self.num_clients = num_clients
+
+    def simulate_client_delay(
+        self,
+        cid: int,
+        model_size_bytes: int,
+        bytes_uploaded: int,
+        num_samples: int,
+        epochs: int,
+        alg_name: str,
+        public_epochs: int = 5,
+        num_public: int = 500,
+    ) -> tuple[float, float, float]:
+        """Return (t_download, t_train, t_upload) for a single client."""
+        # Speed in bytes per second (from Mbps)
+        upload_speed = (self.client_upload_bw[cid] * 10**6) / 8.0
+        download_speed = (self.client_download_bw[cid] * 10**6) / 8.0
+        comp_speed = self.client_comp_speed[cid]
+
+        # 1. Download Delay
+        t_download = model_size_bytes / download_speed
+
+        # 2. Upload Delay
+        t_upload = bytes_uploaded / upload_speed
+
+        # 3. Local Training Delay
+        if alg_name == "fedmd":
+            t_train = (num_public * public_epochs + num_samples * epochs) / comp_speed
+        else:
+            t_train = (num_samples * epochs) / comp_speed
+
+        return t_download, t_train, t_upload
+
+
+def run_server_side_kd(
+    student_model: nn.Module,
+    teachers: list[nn.Module],
+    public_loader: DataLoader,
+    temperature: float,
+    learning_rate: float,
+    momentum: float,
+    device: torch.device,
+    epochs: int = 1,
+) -> None:
+    """Run server-side knowledge distillation to transfer ensemble knowledge to student model."""
+    optimizer = torch.optim.SGD(
+        student_model.parameters(), lr=learning_rate, momentum=momentum
+    )
+    kl_criterion = nn.KLDivLoss(reduction="batchmean")
+
+    student_model.train()
+    for _ in range(epochs):
+        for images, _ in public_loader:
+            images = images.to(device)
+
+            # Get soft targets from teachers
+            with torch.no_grad():
+                teacher_soft_preds_list = []
+                for teacher in teachers:
+                    t_out = teacher(images)
+                    teacher_soft_preds_list.append(
+                        F.softmax(t_out / temperature, dim=1)
+                    )
+                teacher_soft_preds = torch.stack(teacher_soft_preds_list).mean(dim=0)
+
+            optimizer.zero_grad()
+            student_logits = student_model(images)
+            student_log_soft = F.log_softmax(student_logits / temperature, dim=1)
+
+            # Distillation loss
+            loss = kl_criterion(student_log_soft, teacher_soft_preds) * (temperature**2)
+            loss.backward()
+            optimizer.step()
 
 
 class TelemetryFedAvg(FedAvg):
@@ -77,8 +251,24 @@ class TelemetryFedAvg(FedAvg):
 
         self.client_upload_bw = rng.uniform(bw_min, bw_max, size=self.num_clients)
         self.client_download_bw = rng.uniform(bw_min, bw_max, size=self.num_clients)
-        self.client_comp_speed = np.full(self.num_clients, comp_max)
-        self.client_memory = rng.uniform(2048.0, 16384.0, size=self.num_clients)
+        # Compute speed is also heterogeneous (§2.2: "variable CPU frequencies")
+        self.client_comp_speed = rng.uniform(comp_min, comp_max, size=self.num_clients)
+
+        # Memory: uniform fixed value (control group) or heterogeneous U(2048, 16384) MB (§4.1)
+        uniform_mb = exp_config.get("heterogeneity", {}).get("uniform_memory_mb", None)
+        if uniform_mb is not None:
+            self.client_memory = np.full(self.num_clients, float(uniform_mb))
+            memory_desc = f"fixed {uniform_mb} MB (control group)"
+        else:
+            self.client_memory = rng.uniform(2048.0, 16384.0, size=self.num_clients)
+            memory_desc = "U(2048, 16384) MB"
+
+        self.network_simulator = NetworkSimulator(
+            client_upload_bw=self.client_upload_bw,
+            client_download_bw=self.client_download_bw,
+            client_comp_speed=self.client_comp_speed,
+            num_clients=self.num_clients,
+        )
 
         # DAdaQuant state variables
         self.client_indices_dict = client_indices_dict
@@ -94,8 +284,9 @@ class TelemetryFedAvg(FedAvg):
 
         logger.info(
             f"Initialized TelemetryFedAvg for {self.num_clients} clients. "
-            f"Bandwidth: U({bw_min}, {bw_max}) Mbps. Compute: U({comp_min}, {comp_max}) samples/s. "
-            f"Memory: U(2048, 16384) MB. "
+            f"Bandwidth: U({bw_min}, {bw_max}) Mbps. "
+            f"Compute: U({comp_min}, {comp_max}) samples/s. "
+            f"Memory: {memory_desc}. "
             f"DAdaQuant enabled: {self.dadaquant_enabled}, FedMAQ enabled: {self.fedmaq_enabled}"
         )
 
@@ -167,7 +358,7 @@ class TelemetryFedAvg(FedAvg):
             batch_size = int(self.config.get("experiment", {}).get("batch_size", 64))
 
             # Instantiate temporary model to compute initial gradient norm
-            device = DEVICE
+            device = torch.device(self.config.get("device", DEVICE))
             temp_model = get_model(dataset_name, num_classes)
             temp_model.to(device)
             ndarrays = parameters_to_ndarrays(parameters)
@@ -261,42 +452,23 @@ class TelemetryFedAvg(FedAvg):
             for (client, fit_ins), pid, g_k, n_k in zip(
                 client_instructions, client_pids, grad_norms, dataset_sizes
             ):
-                # Normalized signals
-                tilde_g = g_k / g_max
-                tilde_n = n_k / n_max
-
-                # Tier 1 hard cap: Q_max = floor(c_k / c_unit)
                 c_k = float(self.client_memory[pid])
-                q_max_capped = int(max(1, np.floor(c_k / c_unit)))
-
-                # Tier 2 soft quality target based on the formulation
-                if formulation == 1:
-                    # Alternative 1: Linear Sum
-                    term = gamma1 * tilde_g + gamma2 * tilde_n
-                    q_hat = q_min + np.round((q_max - q_min) * term)
-                elif formulation == 2:
-                    # Alternative 2: Multiplicative
-                    term = (tilde_g**gamma1) * (tilde_n**gamma2)
-                    q_hat = q_min + np.round((q_max - q_min) * term)
-                elif formulation == 3:
-                    # Alternative 3: Gradient-Primary, Data-Modulated
-                    modulator = (1.0 + lambda_val * tilde_n) / (1.0 + lambda_val)
-                    q_hat = q_min + np.round((q_max - q_min) * tilde_g * modulator)
-                elif formulation == 4:
-                    # Alternative 4: Threshold-Based Staged Rule
-                    q_mid = int(np.round((q_max + q_min) / 2.0))
-                    if tilde_g >= tau_g and tilde_n >= tau_n:
-                        q_hat = q_max
-                    elif tilde_g >= tau_g or tilde_n >= tau_n:
-                        q_hat = q_mid
-                    else:
-                        q_hat = q_min
-                else:
-                    q_hat = q_min
-
-                # Apply constraints
-                q_hat = int(max(q_min, min(q_max, q_hat)))
-                q_k_t = int(min(q_max_capped, q_hat))
+                q_k_t = compute_fedmaq_q_k_t(
+                    c_k=c_k,
+                    c_unit=c_unit,
+                    g_k=g_k,
+                    g_max=g_max,
+                    n_k=n_k,
+                    n_max=n_max,
+                    formulation=formulation,
+                    q_min=q_min,
+                    q_max=q_max,
+                    gamma1=gamma1,
+                    gamma2=gamma2,
+                    lambda_val=lambda_val,
+                    tau_g=tau_g,
+                    tau_n=tau_n,
+                )
 
                 # Inject assigned q (instantiate new FitIns to prevent shared reference overwrites)
                 new_fit_ins = FitIns(fit_ins.parameters, dict(fit_ins.config))
@@ -304,9 +476,9 @@ class TelemetryFedAvg(FedAvg):
                 updated_instructions.append((client, new_fit_ins))
                 logger.info(
                     f"FedMAQ - Client {client.cid} (partition {pid}): "
-                    f"c_k={c_k:.1f}MB, g_k={g_k:.4f} (tilde_g={tilde_g:.4f}), "
-                    f"n_k={n_k} (tilde_n={tilde_n:.4f}) -> "
-                    f"Q_max={q_max_capped}, q_hat={q_hat} -> Final assigned q: {q_k_t}"
+                    f"c_k={c_k:.1f}MB, g_k={g_k:.4f} (tilde_g={g_k/g_max:.4f}), "
+                    f"n_k={n_k} (tilde_n={n_k/n_max:.4f}) -> "
+                    f"Final assigned q: {q_k_t}"
                 )
 
             return updated_instructions
@@ -397,28 +569,15 @@ class TelemetryFedAvg(FedAvg):
         else:
             sizes = [1] * len(clients)
 
-        total_size = sum(sizes)
-        w = [size / total_size for size in sizes]
-        w_pow = [wi ** (2.0 / 3.0) for wi in w]
-        w_sq = [wi**2 for wi in w]
-
-        a = sum(w_pow)
-        b = sum(ws / (self.q_t**2) for ws in w_sq)
-
         # Calculate optimal q_i for each client
+        q_i_list = compute_dadaquant_client_q(sizes, self.q_t)
         updated_instructions = []
-        for (client, fit_ins), wi, wi_pow in zip(client_instructions, w, w_pow):
-            if b > 0:
-                q_val = np.sqrt(a / b) * wi_pow
-                q_i = int(max(1, np.round(q_val)))
-            else:
-                q_i = self.q_t
-
-            # Update the configuration dictionary sent to this client
-            fit_ins.config["q"] = q_i
-            updated_instructions.append((client, fit_ins))
+        for (client, fit_ins), q_i in zip(client_instructions, q_i_list):
+            new_fit_ins = FitIns(fit_ins.parameters, dict(fit_ins.config))
+            new_fit_ins.config["q"] = q_i
+            updated_instructions.append((client, new_fit_ins))
             logger.info(
-                f"Client {client.cid} (weight: {wi:.4f}) assigned quantization level: {q_i} "
+                f"Client {client.cid} assigned quantization level: {q_i} "
                 f"(base q_t: {self.q_t})"
             )
 
@@ -453,7 +612,7 @@ class TelemetryFedAvg(FedAvg):
             dataset_name = self.config.get("dataset", {}).get("name", "mnist")
             num_classes = int(self.config.get("dataset", {}).get("num_classes", 10))
             batch_size = int(self.config.get("experiment", {}).get("batch_size", 64))
-            device = DEVICE
+            device = torch.device(self.config.get("device", DEVICE))
 
             if alg_name in ["fedkd", "fedmaq"]:
                 student_model = get_kd_student_model(dataset_name, num_classes)
@@ -511,41 +670,26 @@ class TelemetryFedAvg(FedAvg):
                     temperature = float(
                         self.config.get("algorithm", {}).get("temperature", 1.0)
                     )
-
-                    optimizer = torch.optim.SGD(
-                        student_model.parameters(), lr=0.01, momentum=0.9
+                    kd_lr = float(
+                        self.config.get("algorithm", {}).get("server_kd_lr", 0.01)
                     )
-                    kl_criterion = nn.KLDivLoss(reduction="batchmean")
+                    kd_momentum = float(
+                        self.config.get("algorithm", {}).get("server_kd_momentum", 0.9)
+                    )
+                    kd_epochs = int(
+                        self.config.get("algorithm", {}).get("kd_epochs", 1)
+                    )
 
-                    student_model.train()
-                    # Run 1 epoch of distillation over public dataset
-                    for images, _ in public_loader:
-                        images = images.to(device)
-
-                        # Get soft targets from teachers
-                        with torch.no_grad():
-                            teacher_soft_preds_list = []
-                            for teacher in teachers:
-                                t_out = teacher(images)
-                                teacher_soft_preds_list.append(
-                                    F.softmax(t_out / temperature, dim=1)
-                                )
-                            teacher_soft_preds = torch.stack(
-                                teacher_soft_preds_list
-                            ).mean(dim=0)
-
-                        optimizer.zero_grad()
-                        student_logits = student_model(images)
-                        student_log_soft = F.log_softmax(
-                            student_logits / temperature, dim=1
-                        )
-
-                        # Distillation loss
-                        loss = kl_criterion(student_log_soft, teacher_soft_preds) * (
-                            temperature**2
-                        )
-                        loss.backward()
-                        optimizer.step()
+                    run_server_side_kd(
+                        student_model=student_model,
+                        teachers=teachers,
+                        public_loader=public_loader,
+                        temperature=temperature,
+                        learning_rate=kd_lr,
+                        momentum=kd_momentum,
+                        epochs=kd_epochs,
+                        device=device,
+                    )
 
                     # Extract updated weights
                     updated_ndarrays = get_model_parameters(student_model)
@@ -635,41 +779,35 @@ class TelemetryFedAvg(FedAvg):
             if cid < 0 or cid >= self.num_clients:
                 cid = hash(client_proxy.cid) % self.num_clients
 
-            # Bandwidth (Mbps -> bytes per second)
-            upload_speed = (self.client_upload_bw[cid] * 10**6) / 8.0
-            download_speed = (self.client_download_bw[cid] * 10**6) / 8.0
-            comp_speed = self.client_comp_speed[cid]
-
-            # 1. Download Delay
-            t_download = model_size_bytes / download_speed
-            round_bytes_downloaded += model_size_bytes
-
-            # 2. Upload Delay (based on compressed/uncompressed sizes returned by client)
+            # 1 & 2 & 3. Simulating physical delays using NetworkSimulator
             bytes_uploaded = int(
                 fit_res.metrics.get("bytes_uploaded", model_size_bytes)
             )
-            t_upload = bytes_uploaded / upload_speed
-            round_bytes_uploaded += bytes_uploaded
-
-            # 3. Local Training Delay
             num_samples = fit_res.num_examples
-            if alg_name == "fedmd":
-                public_epochs = int(
-                    self.config.get("algorithm", {}).get("public_epochs", 5)
-                )
-                num_public = int(
-                    self.config.get("experiment", {}).get("num_public_samples", 500)
-                )
-                # For FedMD, the training time includes public dataset distillation
-                t_train = (
-                    num_public * public_epochs + num_samples * epochs
-                ) / comp_speed
-            else:
-                t_train = (num_samples * epochs) / comp_speed
+            public_epochs = int(
+                self.config.get("algorithm", {}).get("public_epochs", 5)
+            )
+            num_public = int(
+                self.config.get("experiment", {}).get("num_public_samples", 200)
+            )
 
-            # Total round time for client
+            t_download, t_train, t_upload = (
+                self.network_simulator.simulate_client_delay(
+                    cid=cid,
+                    model_size_bytes=model_size_bytes,
+                    bytes_uploaded=bytes_uploaded,
+                    num_samples=num_samples,
+                    epochs=epochs,
+                    alg_name=alg_name,
+                    public_epochs=public_epochs,
+                    num_public=num_public,
+                )
+            )
+
             client_total_time = t_download + t_train + t_upload
             round_delays.append(client_total_time)
+            round_bytes_downloaded += model_size_bytes
+            round_bytes_uploaded += bytes_uploaded
 
         # For a synchronous server round, the round time is determined by the slowest client
         round_time = max(round_delays) if round_delays else 0.0
