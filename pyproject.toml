@@ -42,10 +42,6 @@ select = ["E", "F", "I", "UP"]
 publisher = "fedmaq"
 flwr-version-target = "1.31.0"
 
-[tool.flwr.app.components]
-serverapp = "fedmaq.phase1_env.server:app"
-clientapp = "fedmaq.phase1_env.client:app"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

@@ -12,6 +12,6 @@ Canonical thesis domain rules: `.cursor/rules/` (migrated from `context.md`).
 | Experiment runs       | `.cursor/project/experiment_registry.md` |
 | Human snapshot        | `context.md` (deprecated for agents)     |
 | Hydra configs         | `conf/`                                  |
-| Source layout         | `src/fedmaq/` (phases + `baselines/`)    |
+| Source layout         | `src/fedmaq/` (`core/` + `baselines/`)   |
 
 **Sibling repos (multi-root workspace):** `fedmaq-literature`, `fedmaq-analyses`, `fedmaq-manuscript`, `fedmaq-presentations`.

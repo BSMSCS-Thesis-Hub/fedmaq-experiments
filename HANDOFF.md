@@ -44,7 +44,7 @@ Living document for agent-to-agent and session-to-session continuity across the 
 | Topic              | Decision                                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
 | Thesis context     | `fedmaq-experiments/.cursor/rules/` (decomposed from `context.md`; `context.md` is human snapshot only) |
-| Experiments layout | uv monorepo, 4 phases under `src/fedmaq/`, baselines in `src/fedmaq/baselines/`                         |
+| Experiments layout | uv monorepo, code under `src/fedmaq/core/` and `src/fedmaq/baselines/`                                  |
 | Tooling            | Preferred stack in `tech-stack.mdc`; adopt extra libs (pandas, sklearn, etc.) when justified            |
 | Literature PDFs    | Never parse `papers/*.pdf` in chat; pipeline + `markdown/` only                                         |
 | RAG boundaries     | Drafts → `*/drafts/`; human `approve` before promotion; no cross-repo auto-edits                        |
@@ -60,7 +60,7 @@ Living document for agent-to-agent and session-to-session continuity across the 
 
 | Done                                                            | Pending                       |
 | --------------------------------------------------------------- | ----------------------------- |
-| `pyproject.toml`, `src/fedmaq/` phase packages, `conf/`, tests  | Port remaining SOTA baselines |
+| `pyproject.toml`, codebase structure, `conf/`, tests            | Port remaining SOTA baselines |
 | 11 `.cursor/rules/`, registries, 2 skills                       | (FedDistill, CFD, FedMAQ)     |
 | `context.md` deprecation notice                                 | Docker integration            |
 | Phase 1 environment: model factory, partitioning, caching,      |                               |
@@ -69,7 +69,7 @@ Living document for agent-to-agent and session-to-session continuity across the 
 | DAdaQuant), model distillation (FedMD), and hybrid Q+KD (FedKD) |                               |
 | implementations                                                 |                               |
 
-Key paths: `src/fedmaq/phase1_env/` … `phase4_benchmark/`, `.cursor/project/baseline_registry.md`
+Key paths: `src/fedmaq/core/`, `src/fedmaq/baselines/`, `.cursor/project/baseline_registry.md`
 
 ### fedmaq-literature — [Complete]
 

@@ -7,11 +7,7 @@ FedMAQ thesis experiments: phased uv monorepo (Flower, Hydra, PyTorch, WandB).
 ```text
 conf/                 # Hydra config groups
 src/fedmaq/
-  core/               # shared utilities
-  phase1_env/         # baseline FL environment
-  phase2_quant/       # quantization ablations
-  phase3_kd/          # server-side KD
-  phase4_benchmark/   # unified benchmarking
+  core/               # shared Flower simulation & telemetry utilities
   baselines/          # SOTA baseline implementations
 .cursor/rules/        # canonical thesis domain context for workspace
 .cursor/project/      # experiment + baseline registries
