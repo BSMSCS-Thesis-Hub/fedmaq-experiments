@@ -3,9 +3,10 @@
 num_clients: 10
 batch_size: 64            # B
 local_epochs: 5           # E
-learning_rate: 0.01       # eta
-weight_decay: 0.0         # separate from momentum; tune per experiment
-momentum: 0.9             # rho (SGD momentum, aligned with FL literature)
+learning_rate: 0.01       # eta (base learning rate)
+learning_rate_decay: 0.99 # gamma (per-round exponential decay factor)
+weight_decay: 0.0001      # lambda (SGD weight decay, 10^-4)
+momentum: 0.9             # beta (SGD momentum, aligned with FL literature)
 client_fraction: 0.1      # C (10% per round)
 total_rounds: 100         # R per manuscript §4.3, Table 4.1
 num_public_samples: 200   # |D_pub| per manuscript §4.3, Table 4.1

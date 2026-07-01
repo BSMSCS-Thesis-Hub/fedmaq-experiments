@@ -8,13 +8,14 @@ alwaysApply: false
 
 Use as starting values in `conf/experiment/` and overrides:
 
-| Symbol   | Parameter                 | Default        |
-| -------- | ------------------------- | -------------- |
-| $B$      | Local batch size          | 64             |
-| $E$      | Local epochs              | 5              |
-| $\eta$   | Learning rate             | 0.01           |
-| $\rho$   | Momentum                  | 0.9            |
-|          | Weight decay              | 0.0            |
-| $\alpha$ | Dirichlet concentration   | 0.1, 1.0, 10.0 |
-| $C$      | Client fraction per round | 0.1            |
-| $R$      | Communication rounds      | 100            |
+| Symbol    | Parameter                 | Default        |
+| --------- | ------------------------- | -------------- |
+| $B$       | Local batch size          | 64             |
+| $E$       | Local epochs              | 5              |
+| $\eta$    | Base learning rate        | 0.01           |
+| $\gamma$  | Learning rate decay       | 0.99           |
+| $\beta$   | Momentum                  | 0.9            |
+| $\lambda$ | Weight decay              | $10^{-4}$      |
+| $\alpha$  | Dirichlet concentration   | 0.1, 1.0, 10.0 |
+| $C$       | Client fraction per round | 0.1            |
+| $R$       | Communication rounds      | 100            |
