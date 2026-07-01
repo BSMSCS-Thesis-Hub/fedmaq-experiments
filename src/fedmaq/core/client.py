@@ -101,6 +101,13 @@ class GenericClient(fl.client.NumPyClient):
     def get_properties(self, config: dict[str, Any]) -> dict[str, Any]:
         return {"cid": self.cid}
 
+    def _get_decayed_lr(self, config: dict[str, Any]) -> float:
+        exp_config = self.config.get("experiment", self.config)
+        base_lr = float(config.get("lr", exp_config.get("learning_rate", 0.01)))
+        lr_decay = float(exp_config.get("learning_rate_decay", 1.0))
+        server_round = int(config.get("server_round", 1))
+        return base_lr * (lr_decay ** (server_round - 1))
+
     def fit(
         self, parameters: list[np.ndarray], config: dict[str, Any]
     ) -> tuple[list[np.ndarray], int, dict[str, Any]]:
@@ -132,7 +139,7 @@ class GenericClient(fl.client.NumPyClient):
             pub_pretrain_epochs = int(alg_cfg.get("public_pretrain_epochs", 10))
             priv_pretrain_epochs = int(alg_cfg.get("private_pretrain_epochs", 10))
             exp_config = self.config.get("experiment", self.config)
-            lr = float(config.get("lr", exp_config.get("learning_rate", 0.01)))
+            lr = self._get_decayed_lr(config)
             weight_decay = float(exp_config.get("weight_decay", 0.0))
             momentum = float(exp_config.get("momentum", alg_cfg.get("momentum", 0.9)))
 
@@ -178,7 +185,7 @@ class GenericClient(fl.client.NumPyClient):
             alg_cfg = self.config.get("algorithm", {})
             public_epochs = int(alg_cfg.get("public_epochs", 5))
             exp_config = self.config.get("experiment", self.config)
-            lr = float(config.get("lr", exp_config.get("learning_rate", 0.01)))
+            lr = self._get_decayed_lr(config)
             weight_decay = float(exp_config.get("weight_decay", 0.0))
             momentum = float(exp_config.get("momentum", alg_cfg.get("momentum", 0.9)))
 
@@ -280,7 +287,7 @@ class GenericClient(fl.client.NumPyClient):
 
         # 4. Setup Joint Optimizer
         exp_config = self.config.get("experiment", self.config)
-        lr = float(config.get("lr", exp_config.get("learning_rate", 0.01)))
+        lr = self._get_decayed_lr(config)
         weight_decay = float(exp_config.get("weight_decay", 0.0))
         epochs = int(config.get("epochs", exp_config.get("local_epochs", 5)))
 
@@ -395,7 +402,7 @@ class GenericClient(fl.client.NumPyClient):
 
         # Retrieve round configurations (with defaults from config)
         exp_config = self.config.get("experiment", self.config)
-        lr = float(config.get("lr", exp_config.get("learning_rate", 0.01)))
+        lr = self._get_decayed_lr(config)
         epochs = int(config.get("epochs", exp_config.get("local_epochs", 5)))
         weight_decay = float(exp_config.get("weight_decay", 0.0))
         momentum = float(
