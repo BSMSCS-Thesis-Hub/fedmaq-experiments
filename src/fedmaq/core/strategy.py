@@ -146,12 +146,17 @@ class NetworkSimulator:
         alg_name: str,
         public_epochs: int = 5,
         num_public: int = 200,
+        server_round: int = 1,
     ) -> tuple[float, float, float]:
         """Return (t_download, t_train, t_upload) for a single client."""
         # Speed in bytes per second (from Mbps)
         upload_speed = (self.client_upload_bw[cid] * 10**6) / 8.0
         download_speed = (self.client_download_bw[cid] * 10**6) / 8.0
         comp_speed = self.client_comp_speed[cid]
+
+        # Apply computational penalty scale factor for FedKD due to dual model training
+        if alg_name == "fedkd":
+            comp_speed = comp_speed / 2.5
 
         # 1. Download Delay
         t_download = model_size_bytes / download_speed
@@ -161,7 +166,18 @@ class NetworkSimulator:
 
         # 3. Local Training Delay
         if alg_name == "fedmd":
-            t_train = (num_public * public_epochs + num_samples * epochs) / comp_speed
+            # In round 1, include mandatory public and private pre-training (10 epochs each)
+            if server_round == 1:
+                t_train = (
+                    num_public * 10
+                    + num_samples * 10
+                    + num_public * public_epochs
+                    + num_samples * epochs
+                ) / comp_speed
+            else:
+                t_train = (
+                    num_public * public_epochs + num_samples * epochs
+                ) / comp_speed
         else:
             t_train = (num_samples * epochs) / comp_speed
 
@@ -235,27 +251,39 @@ class TelemetryFedAvg(FedAvg):
         self.simulated_time = 0.0
         self.cumulative_bytes = 0
 
-        # Draw bandwidths from uniform U(bw_min, bw_max) in Mbps
-        bw_cfg = exp_config.get("heterogeneity", {}).get("bandwidth", {})
-        bw_min = float(bw_cfg.get("min_mbps", 5.0))
-        bw_max = float(bw_cfg.get("max_mbps", 20.0))
-
-        # Draw compute speeds from uniform U(comp_min, comp_max) in samples/second
-        comp_cfg = exp_config.get("heterogeneity", {}).get("compute", {})
-        comp_min = float(comp_cfg.get("min_samples_per_sec", 100.0))
-        comp_max = float(comp_cfg.get("max_samples_per_sec", 500.0))
-
         # Seeded generator for reproducibility
         seed = config.get("seed", 42)
         rng = np.random.default_rng(seed)
 
-        self.client_upload_bw = rng.uniform(bw_min, bw_max, size=self.num_clients)
-        self.client_download_bw = rng.uniform(bw_min, bw_max, size=self.num_clients)
-        # Compute speed is also heterogeneous (§2.2: "variable CPU frequencies")
-        self.client_comp_speed = rng.uniform(comp_min, comp_max, size=self.num_clients)
+        # Bandwidth and Compute are uniform
+        if "bandwidth_mbps" in exp_config:
+            bandwidth_mbps = float(exp_config["bandwidth_mbps"])
+        else:
+            # Fallback to check nested config
+            bw_cfg = exp_config.get("heterogeneity", {}).get("bandwidth", {})
+            bandwidth_mbps = float(bw_cfg.get("min_mbps", 10.0))
+
+        if "compute_samples_per_sec" in exp_config:
+            compute_samples_per_sec = float(exp_config["compute_samples_per_sec"])
+        else:
+            # Fallback to check nested config
+            comp_cfg = exp_config.get("heterogeneity", {}).get("compute", {})
+            compute_samples_per_sec = float(comp_cfg.get("min_samples_per_sec", 200.0))
+
+        self.client_upload_bw = np.full(self.num_clients, bandwidth_mbps)
+        self.client_download_bw = np.full(self.num_clients, bandwidth_mbps)
+        self.client_comp_speed = np.full(self.num_clients, compute_samples_per_sec)
 
         # Memory: uniform fixed value (control group) or heterogeneous U(2048, 16384) MB (§4.1)
-        uniform_mb = exp_config.get("heterogeneity", {}).get("uniform_memory_mb", None)
+        uniform_mb = None
+        for cfg_source in [exp_config, config]:
+            if isinstance(cfg_source, dict):
+                h_cfg = cfg_source.get("heterogeneity", {})
+                if isinstance(h_cfg, dict):
+                    uniform_mb = h_cfg.get("uniform_memory_mb", None)
+                    if uniform_mb is not None:
+                        break
+
         if uniform_mb is not None:
             self.client_memory = np.full(self.num_clients, float(uniform_mb))
             memory_desc = f"fixed {uniform_mb} MB (control group)"
@@ -284,8 +312,8 @@ class TelemetryFedAvg(FedAvg):
 
         logger.info(
             f"Initialized TelemetryFedAvg for {self.num_clients} clients. "
-            f"Bandwidth: U({bw_min}, {bw_max}) Mbps. "
-            f"Compute: U({comp_min}, {comp_max}) samples/s. "
+            f"Bandwidth (uniform): {bandwidth_mbps} Mbps. "
+            f"Compute (uniform): {compute_samples_per_sec} samples/s. "
             f"Memory: {memory_desc}. "
             f"DAdaQuant enabled: {self.dadaquant_enabled}, FedMAQ enabled: {self.fedmaq_enabled}"
         )
@@ -801,6 +829,7 @@ class TelemetryFedAvg(FedAvg):
                     alg_name=alg_name,
                     public_epochs=public_epochs,
                     num_public=num_public,
+                    server_round=server_round,
                 )
             )
 
@@ -809,8 +838,25 @@ class TelemetryFedAvg(FedAvg):
             round_bytes_downloaded += model_size_bytes
             round_bytes_uploaded += bytes_uploaded
 
-        # For a synchronous server round, the round time is determined by the slowest client
-        round_time = max(round_delays) if round_delays else 0.0
+        # Decouple client and server simulated delays
+        client_sim_time = max(round_delays) if round_delays else 0.0
+
+        # Calculate server simulated time (non-zero for FedMAQ server-side distillation)
+        server_sim_time = 0.0
+        if alg_name == "fedmaq" and aggregated_parameters is not None:
+            num_teachers = len(results)
+            num_public = int(
+                self.config.get("experiment", {}).get("num_public_samples", 200)
+            )
+            kd_epochs = int(self.config.get("algorithm", {}).get("kd_epochs", 1))
+            server_comp_speed = (
+                2000.0  # Simulated high-performance server speed (samples/sec)
+            )
+            server_sim_time = (
+                num_public * kd_epochs * num_teachers
+            ) / server_comp_speed
+
+        round_time = client_sim_time + server_sim_time
         self.simulated_time += round_time
 
         # Track total communication bytes for this round
@@ -818,6 +864,8 @@ class TelemetryFedAvg(FedAvg):
         self.cumulative_bytes += round_total_bytes
         self.last_round_bytes = round_total_bytes
         self.last_round_time = round_time
+        self.last_client_time = client_sim_time
+        self.last_server_time = server_sim_time
 
         # Pass round stats in metrics dict
         metrics["round_time"] = round_time
@@ -869,6 +917,12 @@ class TelemetryFedAvg(FedAvg):
             round_time = (
                 getattr(self, "last_round_time", 0.0) if server_round > 0 else 0.0
             )
+            client_time = (
+                getattr(self, "last_client_time", 0.0) if server_round > 0 else 0.0
+            )
+            server_time = (
+                getattr(self, "last_server_time", 0.0) if server_round > 0 else 0.0
+            )
 
             # Build unified metrics dict
             log_metrics = {
@@ -877,6 +931,8 @@ class TelemetryFedAvg(FedAvg):
                 "test/accuracy": acc,
                 "communication/round_bytes": round_bytes,
                 "system/round_time_sec": round_time,
+                "system/client_sim_time_sec": client_time,
+                "system/server_sim_time_sec": server_time,
             }
 
             # Merge other metrics returned by evaluate_fn (e.g. precision, recall, f1)

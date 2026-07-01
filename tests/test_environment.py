@@ -135,10 +135,8 @@ def test_simulation_dry_run(mock_dataset, tmp_path, monkeypatch):
         "total_rounds": 1,
         "seed": 42,
         "client_fraction": 1.0,
-        "heterogeneity": {
-            "bandwidth": {"min_mbps": 5.0, "max_mbps": 20.0},
-            "compute": {"min_samples_per_sec": 100.0, "max_samples_per_sec": 500.0},
-        },
+        "bandwidth_mbps": 10.0,
+        "compute_samples_per_sec": 200.0,
         "telemetry": {
             "wandb_enabled": False,
             "project": "test",
@@ -271,8 +269,13 @@ def test_dadaquant_strategy_allocation():
         def __init__(self, cid: str) -> None:
             super().__init__(cid)
 
-        def get_properties(self, ins, timeout):
-            return None
+        def get_properties(self, ins, timeout=None, group_id=None):
+            from flwr.common import Code, GetPropertiesRes, Status
+
+            return GetPropertiesRes(
+                status=Status(code=Code.OK, message=""),
+                properties={"cid": int(self.cid)},
+            )
 
         def get_parameters(self, ins, timeout):
             return None
@@ -349,10 +352,8 @@ def test_fedmd_simulation_dry_run(mock_dataset, tmp_path, monkeypatch):
             "total_rounds": 2,
             "seed": 42,
             "client_fraction": 1.0,
-            "heterogeneity": {
-                "bandwidth": {"min_mbps": 5.0, "max_mbps": 20.0},
-                "compute": {"min_samples_per_sec": 100.0, "max_samples_per_sec": 500.0},
-            },
+            "bandwidth_mbps": 10.0,
+            "compute_samples_per_sec": 200.0,
             "telemetry": {
                 "wandb_enabled": False,
                 "project": "test",
@@ -542,10 +543,8 @@ def test_fedkd_simulation_dry_run(mock_dataset, tmp_path, monkeypatch):
             "total_rounds": 2,
             "seed": 42,
             "client_fraction": 1.0,
-            "heterogeneity": {
-                "bandwidth": {"min_mbps": 5.0, "max_mbps": 20.0},
-                "compute": {"min_samples_per_sec": 100.0, "max_samples_per_sec": 500.0},
-            },
+            "bandwidth_mbps": 10.0,
+            "compute_samples_per_sec": 200.0,
             "telemetry": {
                 "wandb_enabled": False,
                 "project": "test",
@@ -559,13 +558,8 @@ def test_fedkd_simulation_dry_run(mock_dataset, tmp_path, monkeypatch):
                 "local_epochs": 1,
                 "learning_rate": 0.01,
                 "weight_decay": 0.0,
-                "heterogeneity": {
-                    "bandwidth": {"min_mbps": 5.0, "max_mbps": 20.0},
-                    "compute": {
-                        "min_samples_per_sec": 100.0,
-                        "max_samples_per_sec": 500.0,
-                    },
-                },
+                "bandwidth_mbps": 10.0,
+                "compute_samples_per_sec": 200.0,
             },
             "algorithm": {
                 "name": "fedkd",

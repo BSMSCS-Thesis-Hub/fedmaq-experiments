@@ -2,12 +2,12 @@
 
 Living document for agent-to-agent and session-to-session continuity across the FedMAQ thesis multi-repo workspace.
 
-| Field                  | Value                                                                    |
-| ---------------------- | ------------------------------------------------------------------------ |
-| **Last updated**       | 2026-07-01                                                               |
-| **Last session focus** | Full manuscript audit (Ch. 1--4) + codebase hardening; all 19 tests pass |
-| **Active repo**        | fedmaq-experiments                                                       |
-| **Blockers**           | None                                                                     |
+| Field                  | Value                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-07-02                                                                                                                   |
+| **Last session focus** | Implement mathematically fair decoupled client/server simulated runtimes, resolve test flakiness, and run 5-round benchmarks |
+| **Active repo**        | fedmaq-experiments                                                                                                           |
+| **Blockers**           | None                                                                                                                         |
 
 ---
 
@@ -71,6 +71,9 @@ Living document for agent-to-agent and session-to-session continuity across the 
 | Full manuscript audit (Ch. 1--4); all discrepancies resolved   |                               |
 | Bug fixes: seeded RNG for DAdaQuant, heterogeneous comp speed  |                               |
 | Config hardening: ci.yaml, kd_epochs, uniform_memory.yaml      |                               |
+| Decoupled simulated client/server times & telemetry logger     |                               |
+| Mathematical fairness client penalties & server delays added   |                               |
+| 5-round GPU benchmark runs executed and analyzed for 7 algos   |                               |
 
 Key paths: `src/fedmaq/core/`, `src/fedmaq/baselines/`, `.cursor/project/baseline_registry.md`
 
@@ -111,6 +114,8 @@ Stack: Docling primary, Marker GPU fallback → `markdown/{slug}/` → Qwen3-4B 
 | LaTeX template integrated with Chapters 1--4                   | Draft final Chapters 5 and 6                     |
 | Granular, non-overlapping Gantt Chart of Activities configured | Incorporate proposal panel feedback post-defense |
 | `.cursor/` rules configured (`thesis-context`, `latex_rules`)  |                                                  |
+| Updated Chapter 4 with decoupled simulated time formulation    |                                                  |
+| Added mathematical fairness explanations for client/server KD  |                                                  |
 
 ---
 
@@ -216,6 +221,26 @@ Create `.env` locally (gitignored); document new vars here when added.
 
 ## 10. Changelog
 
+### 2026-07-02 — Uniform System Simulation and Preliminary Config Updates
+
+- **Uniform System Parameters:** Removed heterogeneous bandwidth and compute parameters (from `conf/experiment/default.yaml` and `tests/test_environment.py`). Migrated to uniform system simulation using configurable `bandwidth_mbps` (default 10.0 Mbps) and `compute_samples_per_sec` (default 200 samples/sec) across all clients in `TelemetryFedAvg`.
+- **Preliminary Test Setup:** Configured `num_clients: 50` and `total_rounds: 10` for preliminary iterative comparisons.
+- **Decoupled simulated runtime:** Implemented decoupled simulated client training time and server processing/distillation time in `TelemetryFedAvg` strategy (`strategy.py`) and `TelemetryManager` (`telemetry.py`), writing them to separate metrics fields (`system/client_sim_time_sec` and `system/server_sim_time_sec`).
+- **FedKD compute scaling:** Applied a $2.5\times$ computational penalty scale factor to client compute speeds for `fedkd` to model the increased overhead of training both student and teacher models concurrently.
+- **FedMD pre-training delay:** Adjusted the client training delay simulation for `fedmd` during Round 1 to include the 10 public pre-training and 10 private pre-training epochs.
+- **FedMAQ server delay:** Formulated and added the server-side proxy ensemble distillation delay ($T_{server}$) for `fedmaq` based on public proxy dataset size, epoch count, and active teachers.
+- **Test suite flakiness resolved:** Updated the `get_properties` mock in `test_dadaquant_strategy_allocation` inside `test_environment.py` to deterministically map clients to partitions, preventing hash-seed random fallback failures.
+- **5-Round benchmark simulation:** Executed full 5-round MNIST training runs for all 7 FL algorithms (`fedavg`, `fedprox`, `fedpaq`, `dadaquant`, `fedmd`, `fedkd`, and `fedmaq`) using GPU training, validating stable convergence and correct logging.
+- **Manuscript alignment:** Updated subsubsection items in `chapter_4.tex` to clean up brackets and synchronize the decoupled simulated time formulation.
+
+### 2026-07-01 — Manuscript Table 4.1 Hyperparameter Synchronization and Gitignore Cleanup
+
+- **Hyperparameter alignment:** Modified `chapter_4.tex` and `.cursor/rules/hyperparameters.mdc` to split weight decay and momentum, add learning rate decay ($\gamma = 0.99$), and correct weight decay to $\lambda = 10^{-4}$ (0.0001).
+- **Learning rate decay:** Implemented `_get_decayed_lr` in `GenericClient` in `client.py` and integrated it across standard, FedMD, and FedKD training loops to apply exponential per-round decay.
+- **Default parameters corrected:** Updated parameter defaults for public dataset size from 500 to 200 in `partitioning.py` and `strategy.py` to match the manuscript default value.
+- **Gitignore and untracked logs:** Added `wandb/` and local logs `experiment_log.csv` and `experiment_log.jsonl` to `.gitignore` in `fedmaq-experiments`, and ran a cached git remove to untrack them.
+- **Rule alignment:** Updated `.cursor/rules/` (`baselines.mdc`, `datasets-simulation.mdc`, `evaluation-metrics.mdc`, `hyperparameters.mdc`) to match the streamlined baseline count (8), corrected Dirichlet alpha values (0.1, 1.0, 10.0), and added auxiliary metrics.
+
 ### 2026-07-01 — Full Manuscript Audit (Ch. 1--4) and Codebase Hardening
 
 **Audit scope:** All four released chapters compared line-by-line against the experiment codebase.
@@ -241,95 +266,6 @@ Create `.env` locally (gitignored); document new vars here when added.
 - Integrated macro-averaged Precision, Recall, and F1-score evaluation metrics on the server in `run.py`'s global and client-averaging evaluation paths.
 - Setup local telemetry logging to generate isolated `experiment_log.jsonl` and `experiment_log.csv` run artifacts within each Hydra execution directory using `HydraConfig`.
 - Successfully validated the implementation with the complete test suite and end-to-end 2-round MNIST simulation runs for FedAvg and FedMAQ.
-
-### 2026-06-28 — Verification and alignment of 6 experiment baselines
-
-- Conducted exhaustive verification of all 6 existing FL experiment baselines (FedAvg, FedProx, FedPAQ, DAdaQuant, FedMD, FedKD) against literature summaries.
-- Resolved a discrepancy in the FedKD strategy where SVD parameter reconstruction was missing from the server's download and evaluation paths, ensuring client-side training and evaluation match the reference SVD noise.
-- Fixed a shape mismatch RuntimeError on CIFAR-10 simulations for FedKD by configuring SimpleCNN and TinyCNN in `src/fedmaq/core/models.py` to dynamically compute linear layer input size based on image channel count.
-- Added comprehensive unit tests for `FedPAQCompressionHook` and `FedProxLossHook` in `tests/test_environment.py`.
-- Verified that all 13 tests in the test suite pass with 100% success rate.
-- Ran end-to-end 2-round MNIST simulation dry run for FedKD to ensure convergence and pipeline stability.
-
-### 2026-06-28 — Implementation and verification of FedKD baseline
-
-- Implemented FedKD (Federated Knowledge Distillation) baseline with adaptive mutual knowledge distillation and SVD-based dynamic compression.
-- Created `conf/algorithm/fedkd.yaml` with baseline configurations (tmin, tmax, temperature).
-- Added `TinyCNN` to `src/fedmaq/core/models.py` as a smaller student model for MNIST-like datasets.
-- Implemented `FedKDCompressionHook` in `src/fedmaq/baselines/compression.py` to compress parameters via SVD and estimate byte sizes.
-- Extended client `fit` in `src/fedmaq/core/client.py` to run a local joint training loop optimizing both student and teacher models using reciprocal KL-divergence distillation, saving local teacher weights to disk under `.data_partitions/fedkd_models/`.
-- Modified strategy `TelemetryFedAvg` in `src/fedmaq/core/strategy.py` to inject dynamic round-dependent energy thresholds and calculate SVD-compressed download size.
-- Updated `scripts/run.py` to select correct student models and the compression hook.
-- Added comprehensive unit and integration tests to `tests/test_environment.py` and verified 100% success rate on CPU/GPU simulation.
-
-### 2026-06-28 — Implementation and verification of FedMD baseline
-
-- Implemented FedMD (Federated Model Distillation) baseline following the reference code in `references/fedmd`.
-- Unified client model persistence on disk under `.data_partitions/fedmd_models/` to prevent state loss across dynamic client instantiation in Flower simulation.
-- Extended client `GenericClient.fit` to execute initial pre-training on public/private datasets, soft-target Digest training (using L1 loss), and Revisit training (using CrossEntropy loss).
-- Extended server `TelemetryFedAvg.aggregate_fit` to perform arithmetic mean aggregation of client soft-target predictions on the public dataset and adjust physical training time.
-- Implemented decentralized ensemble evaluation on the test dataset at the server.
-- Added integration test coverage in `tests/test_environment.py` and successfully ran 2-round dry run simulation.
-
-### 2026-06-28 — Implementation and verification of DAdaQuant baseline
-
-- Implemented `DAdaQuantCompressionHook` with stochastic uniform quantization and linear size estimation in `src/fedmaq/baselines/quantization.py`.
-- Integrated client-side local training loss evaluation on received global weights in `GenericClient.fit` when `dadaquant` is active.
-- Implemented server-side double-adaptive strategy logic in `TelemetryFedAvg` (time-adaptive quantization level doubling on convergence lookback, and client-adaptive quantization level assignment based on dataset weights).
-- Added robust test coverage for `DAdaQuantCompressionHook` and `TelemetryFedAvg` adaptive allocation logic in `tests/test_environment.py`.
-- Successfully verified the implementation with unit tests and a 2-round dry run simulation with zero errors.
-
-### 2026-06-28 — Verification of FedAvg/FedProx and implementation of FedPAQ
-
-- Verified `FedAvg` and `FedProx` (with proximal regularization) baselines using 2-round dry run simulations.
-- Implemented `FedPAQ` symmetric uniform quantization baseline as a custom `CompressionHook` in `src/fedmaq/baselines/quantization.py`.
-- Verified `FedPAQ` simulation, showing successful model delta quantization (round transmission size reduced from ~89 MB to ~55 MB, a ~37.5% saving).
-- Configured `pyproject.toml` to prevent `pytest` from collecting tests in `references/` directory.
-
-### 2026-06-28 — SOTA baseline alignment and dependency resolution
-
-- Re-aligned the target baseline suite to match the revised manuscript (Chapters 1–4): Seminal Controls (FedAvg, FedProx), Pure Quantization (FedPAQ, DAdaQuant), Pure KD (FedMD, FedDistill), and Hybrid Q+KD (FedKD, CFD).
-- Excluded unreleased/non-reproducible conceptual competitors (DynFed, FedDT, AdaDQ-KD, LAQ-HC).
-- Deleted obsolete configuration files for `dynfed`, `feddt`, and `laq_hc` under `conf/algorithm/`.
-- Created new algorithm configurations for `fedpaq.yaml`, `feddistill.yaml`, and `cfd.yaml`.
-- Integrated `torch` and `torchvision` dependencies (using CUDA 13.2 wheels index) in `pyproject.toml` to fix unit test collection, executing `uv sync` to update the lock file.
-- Updated baseline and paper registries in both `experiments` and `literature` workspaces.
-- Verified clean execution of the test suite via `pytest`.
-
-### 2026-06-25 — Baselines narrowed to 8 active SOTA algorithms
-
-- Streamlined the thesis scope by narrowing down from 11 baselines to 8 active baselines: FedAvg, FedProx, DAdaQuant, LAQ-HC, FedMD, FedKD, DynFed, and FedDT.
-- Set aside FedPAQ, AdaGQ, FedDistill, and AdaDQ-KD for future consideration.
-- Created `conf/algorithm/fedmd.yaml` and deleted configuration files for the 4 excluded algorithms.
-- Updated baseline registries under `.cursor/project/baseline_registry.md` and `baseline_reference_benchmarks.md`.
-- Modified `chapter_4.tex` in the manuscript repository to update the baseline count and table of hyperparameters.
-- Successfully verified that the LaTeX manuscript compiles clean and all unit tests continue to pass.
-
-### 2026-06-24 — Phase 1 Federated Learning Environment Completed and Verified
-
-- Implemented standard models (`SimpleCNN`, `ResNet18GN`) and parameter extraction/injection helpers in `fedmaq.core.models`.
-- Built Dirichlet data partitioner with determinism and client partitioning cache under `.data_partitions/` in `fedmaq.core.partitioning`.
-- Created customized `TelemetryFedAvg` strategy that simulates client upload/download bandwidth and compute speeds to estimate physical wall-clock time in `fedmaq.core.strategy`.
-- Robustified configuration parsing across the telemetry, client, and strategy classes to seamlessly support nested Hydra experiment keys and command line overrides.
-- Verified and passed all 5 pytest unit tests under `tests/`.
-- Verified end-to-end 1-round CPU simulation using the runner script `scripts/run.py`.
-
-### 2026-06-23 — Y3T3W7 slide deck finalization and presentation styling rules update
-
-- Finalized the Beamer slide deck for progress update `y3t3w7` under `updates/y3t3w7/main.tex`.
-- Pivoted slide content from IoT smart campus energy forecasting to classical Federated Learning (image classification) and the FedMAQ architecture.
-- Integrated SOTA comparison tables, evaluation stack blocks, experimental setups, and manuscript progress checklists.
-- Configured margins globally to `1.2cm` in `preamble/packages.tex`, updated documentclass font size from `10pt` to `11pt` in all slide drivers, and updated `.cursor/rules/beamer_rules.mdc` to document this new standard.
-- Verified successful LaTeX compilation using `latexmk` with zero overfull horizontal boxes or errors.
-
-### 2026-06-23 — Manuscript Gantt Chart Refinement and Cursor rules initialization
-
-- Re-designed the calendar of activities in `fedmaq-manuscript`'s `chapter_4.tex` to be strictly sequential and non-overlapping.
-- Extended the schedule to April 2027 to de-risk baseline implementation and benchmarking under a 15-unit coursework load.
-- Completely excluded December 2026 from active research, indicating coursework finals and holidays, and added a justifying text paragraph.
-- Configured `.cursor/rules/` stubs in the `fedmaq-manuscript` repository (`thesis-context.mdc`, `latex_rules.mdc`, and `repo-preferences.mdc`).
-- Swapped slides preparation and proposal defense/revision rows to match an April 2027 defense timeline.
-- Verified successful LaTeX compilation using `pdflatex main.tex`.
 
 ---
 

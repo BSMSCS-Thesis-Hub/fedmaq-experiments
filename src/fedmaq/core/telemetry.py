@@ -16,7 +16,9 @@ class TelemetryManager:
         self.config = config
         exp_config = config.get("experiment", config)
         self.enabled = exp_config.get("telemetry", {}).get("wandb_enabled", True)
-        self.project = exp_config.get("telemetry", {}).get("project", "fedmaq-experiments")
+        self.project = exp_config.get("telemetry", {}).get(
+            "project", "fedmaq-experiments"
+        )
         self.run_name = exp_config.get("telemetry", {}).get("run_name", None)
         self.run = None
         self.cumulative_bytes = 0
@@ -54,9 +56,13 @@ class TelemetryManager:
                 config=flat_config,
                 mode=exp_config.get("telemetry", {}).get("mode", "online"),
             )
-            logger.info(f"WandB run initialized: {self.run.name if self.run else 'offline'}")
+            logger.info(
+                f"WandB run initialized: {self.run.name if self.run else 'offline'}"
+            )
         except Exception as exc:
-            logger.warning(f"Could not initialize WandB: {exc}. Telemetry will be console-only.")
+            logger.warning(
+                f"Could not initialize WandB: {exc}. Telemetry will be console-only."
+            )
             self.enabled = False
 
     def log(
@@ -81,6 +87,19 @@ class TelemetryManager:
         self.cumulative_time += round_time
         if "system/cumulative_time_sec" not in metrics:
             metrics["system/cumulative_time_sec"] = self.cumulative_time
+
+        # Accumulate client and server times if provided
+        client_time = metrics.get("system/client_sim_time_sec", 0.0)
+        server_time = metrics.get("system/server_sim_time_sec", 0.0)
+        if not hasattr(self, "cumulative_client_time"):
+            self.cumulative_client_time = 0.0
+            self.cumulative_server_time = 0.0
+        self.cumulative_client_time += client_time
+        self.cumulative_server_time += server_time
+        if "system/cumulative_client_time_sec" not in metrics:
+            metrics["system/cumulative_client_time_sec"] = self.cumulative_client_time
+        if "system/cumulative_server_time_sec" not in metrics:
+            metrics["system/cumulative_server_time_sec"] = self.cumulative_server_time
 
         # Print clean summary to console
         test_acc = metrics.get("test/accuracy", 0.0)

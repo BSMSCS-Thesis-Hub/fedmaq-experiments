@@ -1,6 +1,6 @@
 # General experimental hyperparameters (aligned with chapter_4.tex Table 4.1)
 # For fast CI / testing runs, use: +experiment=ci  (overrides total_rounds and num_clients)
-num_clients: 10
+num_clients: 50
 batch_size: 64            # B
 local_epochs: 5           # E
 learning_rate: 0.01       # eta (base learning rate)
@@ -8,17 +8,13 @@ learning_rate_decay: 0.99 # gamma (per-round exponential decay factor)
 weight_decay: 0.0001      # lambda (SGD weight decay, 10^-4)
 momentum: 0.9             # beta (SGD momentum, aligned with FL literature)
 client_fraction: 0.1      # C (10% per round)
-total_rounds: 100         # R per manuscript §4.3, Table 4.1
+total_rounds: 10         # R per manuscript §4.3, Table 4.1
 num_public_samples: 200   # |D_pub| per manuscript §4.3, Table 4.1
+client_gpus: 0.2          # GPU resource fraction allocated per client simulator
 
-# Bandwidth and Compute heterogeneity settings
-heterogeneity:
-  bandwidth:
-    min_mbps: 5.0
-    max_mbps: 20.0
-  compute:
-    min_samples_per_sec: 100.0
-    max_samples_per_sec: 500.0
+# Bandwidth and Compute settings (uniform)
+bandwidth_mbps: 10.0
+compute_samples_per_sec: 200.0
 
 # Telemetry settings
 telemetry:

@@ -12,6 +12,6 @@ alwaysApply: false
 
 **Statistical heterogeneity:** Dirichlet ($\alpha$) partitioning only for non-IID client splits.
 
-**System heterogeneity:** Per-client bandwidth from uniform draws (e.g. $U(5, 20)$ Mbps) to model stragglers.
+**System configuration:** Bandwidth and compute are uniform across all clients (e.g., 10 Mbps bandwidth and 200 samples/sec compute speed) to isolate other factors.
 
 Test $\alpha \in \{0.1, 1.0, 10.0\}$ from extreme skew to near-IID.

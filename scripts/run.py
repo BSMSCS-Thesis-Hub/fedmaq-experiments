@@ -55,6 +55,22 @@ def main(cfg: DictConfig) -> None:
     # Set seed
     set_seed(cfg.seed)
 
+    # Check GPU availability and warn if not detected
+    if not torch.cuda.is_available():
+        logger.warning(
+            "\n"
+            "========================================================================\n"
+            "WARNING: GPU (CUDA) is not detected! The simulation will run on the CPU.\n"
+            "This will significantly increase execution time, especially for large\n"
+            "datasets/models. Please ensure CUDA drivers and PyTorch CUDA build are\n"
+            "installed correctly to utilize the GPU.\n"
+            "========================================================================"
+        )
+    else:
+        logger.info(
+            f"GPU (CUDA) detected. Using device: {torch.cuda.get_device_name(0)}"
+        )
+
     # Convert Hydra config to standard Python dict
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
     logger.info(f"Running simulation with config:\n{OmegaConf.to_yaml(cfg)}")
@@ -154,6 +170,7 @@ def main(cfg: DictConfig) -> None:
         def evaluate_fn(
             server_round: int,
             parameters: fl.common.NDArrays,
+            config: dict[str, fl.common.Scalar],
         ) -> tuple[float, dict[str, Scalar]] | None:
             device_str = OmegaConf.select(cfg, "device", default=None)
             device = torch.device(device_str) if device_str else DEVICE
@@ -222,7 +239,9 @@ def main(cfg: DictConfig) -> None:
     backend_config = {
         "client_resources": {
             "num_cpus": 1,
-            "num_gpus": 0.0,
+            "num_gpus": float(
+                OmegaConf.select(cfg, "experiment.client_gpus", default=0.0)
+            ),
         }
     }
 
