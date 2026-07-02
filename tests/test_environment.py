@@ -970,6 +970,35 @@ def test_compute_fedmaq_q_k_t():
     """Test FedMAQ quantization helper formulas."""
     from fedmaq.core.strategy import compute_fedmaq_q_k_t
 
+    # Test formulation 0: Resource-Only Hard Cap
+    q_res = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=0,
+        q_min=2,
+        q_max=8,
+    )
+    # formulation 0 sets q_hat = q_max = 8. q_max_capped = floor(16384/2048) = 8. min(8, 8) = 8.
+    assert q_res == 8
+
+    q_res_capped = compute_fedmaq_q_k_t(
+        c_k=4096.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=0,
+        q_min=2,
+        q_max=8,
+    )
+    # q_hat = 8, q_max_capped = 2. min(2, 8) = 2.
+    assert q_res_capped == 2
+
     # Test formulation 1: Linear Sum
     q = compute_fedmaq_q_k_t(
         c_k=4096.0,
@@ -1003,6 +1032,89 @@ def test_compute_fedmaq_q_k_t():
         gamma2=0.5,
     )
     assert q == 5
+
+    # Test formulation 2: Multiplicative
+    q_mult = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=2,
+        q_min=2,
+        q_max=8,
+        gamma1=0.5,
+        gamma2=0.5,
+    )
+    # term = (0.5**0.5) * (0.5**0.5) = 0.5. q_hat = 2 + round(6 * 0.5) = 5. min(8, 5) = 5.
+    assert q_mult == 5
+
+    # Test formulation 3: Gradient-Primary, Data-Modulated
+    q_mod = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=3,
+        q_min=2,
+        q_max=8,
+        lambda_val=1.0,
+    )
+    # modulator = (1.0 + 1.0 * 0.5) / 2.0 = 0.75. q_hat = 2 + round(6 * 0.5 * 0.75) = 2 + round(2.25) = 4.
+    assert q_mod == 4
+
+    # Test formulation 4: Threshold-Based Staged Rule
+    # Case A: both thresholds cleared (tilde_g=0.5 >= 0.4, tilde_n=0.5 >= 0.4)
+    q_th_a = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=4,
+        q_min=2,
+        q_max=8,
+        tau_g=0.4,
+        tau_n=0.4,
+    )
+    assert q_th_a == 8
+
+    # Case B: one threshold cleared (tilde_g=0.5 >= 0.4, tilde_n=0.5 < 0.6)
+    q_th_b = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=4,
+        q_min=2,
+        q_max=8,
+        tau_g=0.4,
+        tau_n=0.6,
+    )
+    # q_mid = round(10/2) = 5
+    assert q_th_b == 5
+
+    # Case C: neither threshold cleared (tilde_g=0.5 < 0.6, tilde_n=0.5 < 0.6)
+    q_th_c = compute_fedmaq_q_k_t(
+        c_k=16384.0,
+        c_unit=2048.0,
+        g_k=0.5,
+        g_max=1.0,
+        n_k=100,
+        n_max=200,
+        formulation=4,
+        q_min=2,
+        q_max=8,
+        tau_g=0.6,
+        tau_n=0.6,
+    )
+    assert q_th_c == 2
 
 
 def test_compute_dadaquant_client_q():
