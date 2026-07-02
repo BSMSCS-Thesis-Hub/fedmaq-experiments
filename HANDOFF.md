@@ -2,12 +2,12 @@
 
 Living document for agent-to-agent and session-to-session continuity across the FedMAQ thesis multi-repo workspace.
 
-| Field                  | Value                                                                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-07-02                                                                                                                                              |
-| **Last session focus** | Manuscript alignment (Ch. 1–4 Claude review revision): benchmark scope pruned, FEMNIST writer partition, ablation configs, teacher architecture bug fix |
-| **Active repo**        | fedmaq-experiments, fedmaq-manuscript                                                                                                                   |
-| **Blockers**           | None                                                                                                                                                    |
+| Field                  | Value                                                   |
+| ---------------------- | ------------------------------------------------------- |
+| **Last updated**       | 2026-07-02                                              |
+| **Last session focus** | Workspace Agent Context Pruning & Slash Workflows Setup |
+| **Active repo**        | fedmaq-experiments, fedmaq-manuscript                   |
+| **Blockers**           | None                                                    |
 
 ---
 
@@ -56,126 +56,36 @@ Living document for agent-to-agent and session-to-session continuity across the 
 
 ## 4. Per-repo status
 
-### fedmaq-experiments — [Phase 1 Env Complete; Manuscript Aligned]
+### [fedmaq-experiments](../fedmaq-experiments/) — [Phase 1 Env Complete; Manuscript Aligned]
 
-| Done                                                           | Pending                       |
-| -------------------------------------------------------------- | ----------------------------- |
-| `pyproject.toml`, codebase structure, `conf/`, tests           | Port remaining SOTA baselines |
-| 11 `.cursor/rules/`, registries, 2 skills                      | (FedDistill, CFD — Sep 2026)  |
-| `context.md` deprecation notice                                | Docker integration            |
-| Phase 1 environment: model factory, partitioning, caching,     |                               |
-| telemetry, client/strategy wrappers, `scripts/run.py`          |                               |
-| Seminal controls (FedAvg, FedProx), pure quantization (FedPAQ, |                               |
-| DAdaQuant), model distillation (FedMD), hybrid Q+KD (FedKD),   |                               |
-| and revised FedMAQ implementations                             |                               |
-| Full manuscript audit (Ch. 1--4); all discrepancies resolved   |                               |
-| Bug fixes: seeded RNG for DAdaQuant, heterogeneous comp speed  |                               |
-| Config hardening: ci.yaml, kd_epochs, uniform_memory.yaml      |                               |
-| Decoupled simulated client/server times & telemetry logger     |                               |
-| Mathematical fairness client penalties & server delays added   |                               |
-| 5-round GPU benchmark runs executed and analyzed for 7 algos   |                               |
-| **[THIS SESSION]** Manuscript alignment (Ch. 1–4 revision):    |                               |
-| - `default.yaml` → K=100, R=100 (production); new              |                               |
-| `preliminary.yaml` (K=50, R=10) for staged runs                |                               |
-| - Dataset scope pruned to CIFAR-10, CIFAR-100, FEMNIST         |                               |
-| - α grid pruned to {0.1, 1.0}; α=10.0 config deleted           |                               |
-| - Seeds reduced to 3 canonical: [0, 42, 123]                   |                               |
-| - `partition: writer` mode added for FEMNIST (natural writer   |                               |
-| partitioning via EMNIST byclass natural ordering)              |                               |
-| - `femnist.yaml` experiment override (K=200 writers)           |                               |
-| - 5 ablation algorithm configs added (Arms 2–6 §4.3)           |                               |
-| - `fedavg_kd` algorithm (Arm 6: FedAvg + server KD)            |                               |
-| - Formulation 0 (resource-only) added to strategy              |                               |
-| - **Bug fix**: FedMAQ teacher architecture mismatch fixed      |                               |
-| (teachers now use `get_kd_student_model` matching clients)     |                               |
-| - Pilot study multirun command documented in `config.yaml`     |                               |
-| - All rules updated; 20/20 tests pass (ruff clean)             |                               |
+- **Status details:** See completed baselines and status in [baseline_registry.md](.cursor/project/baseline_registry.md).
+- **Pending:** Port remaining SOTA baselines (FedDistill, CFD — Sep 2026), Docker integration.
 
-Key paths: `src/fedmaq/core/`, `src/fedmaq/baselines/`, `.cursor/project/baseline_registry.md`
+### [fedmaq-literature](../fedmaq-literature/) — [Complete]
 
-### fedmaq-literature — [Complete]
+- **Status details:** See 29 parsed and ingested papers in [paper_registry.md](../fedmaq-literature/.cursor/project/paper_registry.md).
+- **Pending:** None.
 
-| Done                                                                   | Pending |
-| ---------------------------------------------------------------------- | ------- |
-| Folder layout, `.cursor/` rules/skills, `paper_registry.md` (complete) | None    |
-| Docling + Marker convert pipeline, QA, `meta.yaml`, CLI                |         |
-| `fedmaq-lit convert` / `ingest --convert-only`, unit tests             |         |
-| Smoke-tested on `hinton-2015-distillation`, `li-2020-fedprox`          |         |
-| Batch conversion CLI (`--all` flag) and registration of all 29 papers  |         |
-| LlamaIndex + Chroma ingest with Qwen3-4B                               |         |
-| OpenRouter summarize & approve workflow CLI                            |         |
-| Chroma RAG local query & LLM synthesis CLI                             |         |
+### [fedmaq-analyses](../fedmaq-analyses/) — [Scaffold complete]
 
-Stack: Docling primary, Marker GPU fallback → `markdown/{slug}/` → Qwen3-4B → Chroma → query/summarize.
+- **Status details:** See active figures and notebook status in [figure_registry.md](../fedmaq-analyses/.cursor/project/figure_registry.md).
+- **Pending:** WandB/Hydra ingest implementations, Real ablation + thesis figure notebooks.
 
-### fedmaq-analyses — [Scaffold complete]
+### [fedmaq-presentations](../fedmaq-presentations/) — [Complete]
 
-| Done                                                      | Pending                                 |
-| --------------------------------------------------------- | --------------------------------------- |
-| `data/` layout + README, plot style stub, sample notebook | WandB/Hydra ingest implementations      |
-| `.cursor/` rules, skills, `figure_registry.md`            | Real ablation + thesis figure notebooks |
+- **Status details:** Slide mapping and metadata updated in [slide_registry.md](../fedmaq-presentations/.cursor/project/slide_registry.md).
+- **Pending:** None.
 
-### fedmaq-presentations — [Complete]
+### [fedmaq-manuscript](../fedmaq-manuscript/) — [Active]
 
-| Done                                                 | Pending |
-| ---------------------------------------------------- | ------- |
-| `.agents/` → `.cursor/`, metadata aligned to FedMAQ  | None    |
-| `slide_registry.md` paths fixed                      |         |
-| Slide content updates for vision-FL framing (y3t3w7) |         |
-
-### fedmaq-manuscript — [Active]
-
-| Done                                                             | Pending                                          |
-| ---------------------------------------------------------------- | ------------------------------------------------ |
-| LaTeX template integrated with Chapters 1--4                     | Draft final Chapters 5 and 6                     |
-| Granular, non-overlapping Gantt Chart of Activities configured   | Incorporate proposal panel feedback post-defense |
-| `.cursor/` rules configured (`thesis-context`, `latex_rules`)    |                                                  |
-| Updated Chapter 4 with decoupled simulated time formulation      |                                                  |
-| Added mathematical fairness explanations for client/server KD    |                                                  |
-| **[THIS SESSION]** Claude review revisions applied:              |                                                  |
-| - CFD corrected to unlabeled (not labeled) public proxy          |                                                  |
-| - Benchmark scope: 5 → 3 datasets (CIFAR-10, CIFAR-100, FEMNIST) |                                                  |
-| - α grid: {0.1, 1.0, 10.0} → {0.1, 1.0}; K=100 row added         |                                                  |
-| - Pilot study scoped to CIFAR-10, α=0.1 (Ch. 1, 3, 4)            |                                                  |
-| - Gap synthesis sharpened: non-additive interaction effects      |                                                  |
-| - Ablation study formalized as 7 explicit configurations         |                                                  |
-| - Convergence stability metrics section removed                  |                                                  |
-| - Seeds: multiple → three; `§` Candidate Formulation renamed     |                                                  |
+- **Completed:** Chapter 1–4 LaTeX template integrated, Claude audit revisions applied (benchmark scope, $\alpha$ grid, and Pilot study adjustments).
+- **Pending:** Draft final Chapters 5 and 6, incorporate proposal panel feedback post-defense.
 
 ---
 
-## 5. Literature RAG reference (implementation spec)
+## 5. Literature RAG reference
 
-```txt
-papers/*.pdf
-  → Docling convert → QA → Marker fallback if low confidence
-  → markdown/{slug}/paper.md + meta.yaml
-  → LlamaIndex IngestionPipeline → storage/chroma/ (gitignored)
-  → fedmaq-lit summarize → summaries/drafts/{slug}.md
-  → human: fedmaq-lit approve → summaries/{slug}.md
-  → syntheses/drafts/ → approve-synthesis → syntheses/{topic}.md
-```
-
-**Embedding:** `FEDMAQ_EMBED_MODEL=Qwen/Qwen3-Embedding-4B`, fallback `0.6B`, batch size 4–8. Query instruct in `src/fedmaq_literature/ingest/__init__.py`.
-
-**LLM Models (OpenRouter):** Use `deepseek/deepseek-v4-flash` for drafting summaries. Always use `deepseek/deepseek-v4-pro` for automated reviews, verification runs, and global thematic syntheses to ensure mathematical correctness.
-
-**GPU (RTX 5060 8GB):** Do not run Docling/Marker and 4B embedder concurrently.
-
-> [!IMPORTANT]
-> **Expected Execution Runtimes:**
->
-> - **Full PDF to Markdown Conversion (Docling + Marker QA):** ~6.5 to 7 hours total. Avoid re-running conversions from scratch unless necessary.
-> - **Full RAG Ingestion & Embedding (Qwen3-Embedding-4B):** ~14 minutes per paper on CUDA GPU (RTX 5060) (total ~6.8 hours for 29 papers). Ingestion is run sequentially in a loop to provide real-time visibility, log updates, and incremental SQLite commits.
-> - **Paper Summarization (DeepSeek-v4-Flash via OpenRouter):** ~20 to 25 seconds per paper.
-
-**Skills:** `.cursor/skills/ingest-paper`, `summarize-paper`, `approve-summary`, `query-literature` (synthesize skills TBD).
-
-**Component Roles & Purpose:**
-
-- **Chroma Vector DB (RAG):** Manages split text chunks for granular, passage-level retrieval (e.g., retrieving exact formulas or parameters).
-- **Paper Summaries (`summaries/`):** Lightweight markdown files designed to fit easily inside the LLM's context window. They provide high-level summaries of methodology, limitations, and relevance for global reasoning.
-- **Thematic Syntheses (`syntheses/`):** Aggregates summaries by topic to trace cross-paper evidence, support core claims, and identify literature gaps.
+For the architecture stack, ingestion workflows, runtime expectations, and RAG configuration details of the literature indexing pipeline, refer directly to [fedmaq-literature/README.md](../fedmaq-literature/README.md).
 
 ---
 
@@ -246,51 +156,14 @@ Create `.env` locally (gitignored); document new vars here when added.
 
 ## 10. Changelog
 
-### 2026-07-02 — Uniform System Simulation and Preliminary Config Updates
+- See the complete historical archive of session-to-session changes in [changelog.md](.cursor/project/changelog.md).
 
-- **Uniform System Parameters:** Removed heterogeneous bandwidth and compute parameters (from `conf/experiment/default.yaml` and `tests/test_environment.py`). Migrated to uniform system simulation using configurable `bandwidth_mbps` (default 10.0 Mbps) and `compute_samples_per_sec` (default 200 samples/sec) across all clients in `TelemetryFedAvg`.
-- **Preliminary Test Setup:** Configured `num_clients: 50` and `total_rounds: 10` for preliminary iterative comparisons.
-- **Decoupled simulated runtime:** Implemented decoupled simulated client training time and server processing/distillation time in `TelemetryFedAvg` strategy (`strategy.py`) and `TelemetryManager` (`telemetry.py`), writing them to separate metrics fields (`system/client_sim_time_sec` and `system/server_sim_time_sec`).
-- **FedKD compute scaling:** Applied a $2.5\times$ computational penalty scale factor to client compute speeds for `fedkd` to model the increased overhead of training both student and teacher models concurrently.
-- **FedMD pre-training delay:** Adjusted the client training delay simulation for `fedmd` during Round 1 to include the 10 public pre-training and 10 private pre-training epochs.
-- **FedMAQ server delay:** Formulated and added the server-side proxy ensemble distillation delay ($T_{server}$) for `fedmaq` based on public proxy dataset size, epoch count, and active teachers.
-- **Test suite flakiness resolved:** Updated the `get_properties` mock in `test_dadaquant_strategy_allocation` inside `test_environment.py` to deterministically map clients to partitions, preventing hash-seed random fallback failures.
-- **5-Round benchmark simulation:** Executed full 5-round MNIST training runs for all 7 FL algorithms (`fedavg`, `fedprox`, `fedpaq`, `dadaquant`, `fedmd`, `fedkd`, and `fedmaq`) using GPU training, validating stable convergence and correct logging.
-- **Manuscript alignment:** Updated subsubsection items in `chapter_4.tex` to clean up brackets and synchronize the decoupled simulated time formulation.
+### 2026-07-02 — Workspace Agent Context Pruning & Slash Workflows Setup
 
-### 2026-07-01 — Manuscript Table 4.1 Hyperparameter Synchronization and Gitignore Cleanup
-
-- **Hyperparameter alignment:** Modified `chapter_4.tex` and `.cursor/rules/hyperparameters.mdc` to split weight decay and momentum, add learning rate decay ($\gamma = 0.99$), and correct weight decay to $\lambda = 10^{-4}$ (0.0001).
-- **Learning rate decay:** Implemented `_get_decayed_lr` in `GenericClient` in `client.py` and integrated it across standard, FedMD, and FedKD training loops to apply exponential per-round decay.
-- **Default parameters corrected:** Updated parameter defaults for public dataset size from 500 to 200 in `partitioning.py` and `strategy.py` to match the manuscript default value.
-- **Gitignore and untracked logs:** Added `wandb/` and local logs `experiment_log.csv` and `experiment_log.jsonl` to `.gitignore` in `fedmaq-experiments`, and ran a cached git remove to untrack them.
-- **Rule alignment:** Updated `.cursor/rules/` (`baselines.mdc`, `datasets-simulation.mdc`, `evaluation-metrics.mdc`, `hyperparameters.mdc`) to match the streamlined baseline count (8), corrected Dirichlet alpha values (0.1, 1.0, 10.0), and added auxiliary metrics.
-
-### 2026-07-01 — Full Manuscript Audit (Ch. 1--4) and Codebase Hardening
-
-**Audit scope:** All four released chapters compared line-by-line against the experiment codebase.
-
-- Identified and fixed 7 issues across config, source, and scripts; all 19 tests continue to pass post-changes.
-- **Bug: heterogeneous compute speed** — `client_comp_speed` was always pinned to `comp_max`; changed to `rng.uniform(comp_min, comp_max)` per §2.2 ("variable CPU frequencies").
-- **Bug: unseeded stochastic rounding** — `DAdaQuantCompressionHook.compress()` used the global `np.random.rand`, breaking reproducibility; replaced with an injectable `np.random.Generator`.
-- **Documented 5 canonical seeds** `[0, 42, 123, 456, 789]` in `conf/config.yaml` with multirun sweep command; `run.py` now passes `np.random.default_rng(cfg.seed)` to the hook (§4.3 statistical controls).
-- **Config separation (CI vs. production):** `conf/experiment/default.yaml` restored to `total_rounds: 100`; new `conf/experiment/ci.yaml` provides `total_rounds: 2` override (`+experiment=ci`).
-- **Dead config removed:** `kd_weight: 0.5` stripped from `fedmaq.yaml`; replaced with `kd_epochs: 1`, `server_kd_lr`, `server_kd_momentum` as explicit, named KD parameters.
-- **Control group config added:** `conf/heterogeneity/uniform_memory.yaml` (8192 MB fixed) for §4.1 ablation; wired into `TelemetryFedAvg.__init__` via `uniform_memory_mb` key.
-- **`run_server_side_kd` gains `epochs` param:** distillation passes over proxy dataset now configurable; body correctly nested inside both epoch and batch loops.
-- **Stale default fixed:** `num_public_samples` hardcoded default in `aggregate_fit` corrected from 500 → 200.
-- **Safe OmegaConf device resolution:** `cfg.get("device", DEVICE)` → `OmegaConf.select(cfg, "device", default=None)` in `evaluate_fn`.
-- **Potential manuscript error flagged:** Table 4.1 `Weight Decay / Momentum ρ = 0.99` conflates two hyperparameters with a numerically suspect value; recommend splitting into `Momentum ρ = 0.9` / `Weight Decay = 0.0`.
-- **FedDistill and CFD confirmed as zero-implementation stubs** — on schedule for Sep--Oct 2026 per Gantt.
-
-### 2026-07-01 — Revised FedMAQ methodology, auxiliary metrics, and local telemetry logging
-
-- Simplified local client training for FedMAQ in `client.py` to strictly perform task-loss cross-entropy minimization ($L_{local} = CE(\hat{y}, y)$), removing student-teacher mutual learning and model checkpoint persistence on the client.
-- Redesigned server-side ensemble distillation for FedMAQ in `strategy.py` to dynamically construct client teacher models in memory from uploaded parameter updates, completely bypassing disk checkpoint files.
-- Configured a uniform client computation speed (`comp_max`) in `TelemetryFedAvg.__init__` to simulate uniform hardware across the federation.
-- Integrated macro-averaged Precision, Recall, and F1-score evaluation metrics on the server in `run.py`'s global and client-averaging evaluation paths.
-- Setup local telemetry logging to generate isolated `experiment_log.jsonl` and `experiment_log.csv` run artifacts within each Hydra execution directory using `HydraConfig`.
-- Successfully validated the implementation with the complete test suite and end-to-end 2-round MNIST simulation runs for FedAvg and FedMAQ.
+- **Context Optimization**: Pruned redundant tables, literature specifications, and logs from `HANDOFF.md`, linking to active registries and stack readmes.
+- **Workflow Automation**: Defined and automated project-scoped triggers for `/align-manuscript`, `/add-baseline`, and `/run-benchmark` under `.agents/workflows/`.
+- **Rule Consolidation**: Deleted redundant `.cursor/rules/hyperparameters.mdc`, deferring default configs and constraints to `manuscript-alignment.mdc`.
+- **Test Integrity**: Executed `uv run pytest` to ensure all 20 environment and simulation tests pass successfully.
 
 ---
 
