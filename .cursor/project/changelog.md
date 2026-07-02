@@ -4,6 +4,13 @@ Archive of session-to-session changelog entries for the FedMAQ thesis codebase.
 
 ## Historical Entries
 
+### 2026-07-02 — Workspace Agent Context Pruning & Slash Workflows Setup
+
+- **Context Optimization**: Pruned redundant tables, literature specifications, and logs from `HANDOFF.md`, linking to active registries and stack readmes.
+- **Workflow Automation**: Defined and automated project-scoped triggers for `/align-manuscript`, `/add-baseline`, and `/run-benchmark` under `.agents/workflows/`.
+- **Rule Consolidation**: Deleted redundant `.cursor/rules/hyperparameters.mdc`, deferring default configs and constraints to `manuscript-alignment.mdc`.
+- **Test Integrity**: Executed `uv run pytest` to ensure all 20 environment and simulation tests pass successfully.
+
 ### 2026-07-02 — Manuscript Alignment Rule Creation and Test Expansion
 
 - **Canonical Alignment Rules**: Created `manuscript-alignment.mdc` under `.cursor/rules/` to enforce hyperparameter synchronization (Table 4.1), soft quality formulations (0-4), decoupled simulated delays, and test requirements.
@@ -46,12 +53,3 @@ Archive of session-to-session changelog entries for the FedMAQ thesis codebase.
 - **Safe OmegaConf device resolution:** `cfg.get("device", DEVICE)` → `OmegaConf.select(cfg, "device", default=None)` in `evaluate_fn`.
 - **Potential manuscript error flagged:** Table 4.1 `Weight Decay / Momentum ρ = 0.99` conflates two hyperparameters with a numerically suspect value; recommend splitting into `Momentum ρ = 0.9` / `Weight Decay = 0.0`.
 - **FedDistill and CFD confirmed as zero-implementation stubs** — on schedule for Sep--Oct 2026 per Gantt.
-
-### 2026-07-01 — Revised FedMAQ methodology, auxiliary metrics, and local telemetry logging
-
-- Simplified local client training for FedMAQ in `client.py` to strictly perform task-loss cross-entropy minimization ($L_{local} = CE(\hat{y}, y)$), removing student-teacher mutual learning and model checkpoint persistence on the client.
-- Redesigned server-side ensemble distillation for FedMAQ in `strategy.py` to dynamically construct client teacher models in memory from uploaded parameter updates, completely bypassing disk checkpoint files.
-- Configured a uniform client computation speed (`comp_max`) in `TelemetryFedAvg.__init__` to simulate uniform hardware across the federation.
-- Integrated macro-averaged Precision, Recall, and F1-score evaluation metrics on the server in `run.py`'s global and client-averaging evaluation paths.
-- Setup local telemetry logging to generate isolated `experiment_log.jsonl` and `experiment_log.csv` run artifacts within each Hydra execution directory using `HydraConfig`.
-- Successfully validated the implementation with the complete test suite and end-to-end 2-round MNIST simulation runs for FedAvg and FedMAQ.
