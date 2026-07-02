@@ -2,12 +2,12 @@
 
 Living document for agent-to-agent and session-to-session continuity across the FedMAQ thesis multi-repo workspace.
 
-| Field                  | Value                                                                                                                        |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Last updated**       | 2026-07-02                                                                                                                   |
-| **Last session focus** | Implement mathematically fair decoupled client/server simulated runtimes, resolve test flakiness, and run 5-round benchmarks |
-| **Active repo**        | fedmaq-experiments                                                                                                           |
-| **Blockers**           | None                                                                                                                         |
+| Field                  | Value                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Last updated**       | 2026-07-02                                                                                                                                              |
+| **Last session focus** | Manuscript alignment (Ch. 1–4 Claude review revision): benchmark scope pruned, FEMNIST writer partition, ablation configs, teacher architecture bug fix |
+| **Active repo**        | fedmaq-experiments, fedmaq-manuscript                                                                                                                   |
+| **Blockers**           | None                                                                                                                                                    |
 
 ---
 
@@ -74,6 +74,22 @@ Living document for agent-to-agent and session-to-session continuity across the 
 | Decoupled simulated client/server times & telemetry logger     |                               |
 | Mathematical fairness client penalties & server delays added   |                               |
 | 5-round GPU benchmark runs executed and analyzed for 7 algos   |                               |
+| **[THIS SESSION]** Manuscript alignment (Ch. 1–4 revision):    |                               |
+| - `default.yaml` → K=100, R=100 (production); new              |                               |
+| `preliminary.yaml` (K=50, R=10) for staged runs                |                               |
+| - Dataset scope pruned to CIFAR-10, CIFAR-100, FEMNIST         |                               |
+| - α grid pruned to {0.1, 1.0}; α=10.0 config deleted           |                               |
+| - Seeds reduced to 3 canonical: [0, 42, 123]                   |                               |
+| - `partition: writer` mode added for FEMNIST (natural writer   |                               |
+| partitioning via EMNIST byclass natural ordering)              |                               |
+| - `femnist.yaml` experiment override (K=200 writers)           |                               |
+| - 5 ablation algorithm configs added (Arms 2–6 §4.3)           |                               |
+| - `fedavg_kd` algorithm (Arm 6: FedAvg + server KD)            |                               |
+| - Formulation 0 (resource-only) added to strategy              |                               |
+| - **Bug fix**: FedMAQ teacher architecture mismatch fixed      |                               |
+| (teachers now use `get_kd_student_model` matching clients)     |                               |
+| - Pilot study multirun command documented in `config.yaml`     |                               |
+| - All rules updated; 20/20 tests pass (ruff clean)             |                               |
 
 Key paths: `src/fedmaq/core/`, `src/fedmaq/baselines/`, `.cursor/project/baseline_registry.md`
 
@@ -109,13 +125,22 @@ Stack: Docling primary, Marker GPU fallback → `markdown/{slug}/` → Qwen3-4B 
 
 ### fedmaq-manuscript — [Active]
 
-| Done                                                           | Pending                                          |
-| -------------------------------------------------------------- | ------------------------------------------------ |
-| LaTeX template integrated with Chapters 1--4                   | Draft final Chapters 5 and 6                     |
-| Granular, non-overlapping Gantt Chart of Activities configured | Incorporate proposal panel feedback post-defense |
-| `.cursor/` rules configured (`thesis-context`, `latex_rules`)  |                                                  |
-| Updated Chapter 4 with decoupled simulated time formulation    |                                                  |
-| Added mathematical fairness explanations for client/server KD  |                                                  |
+| Done                                                             | Pending                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------ |
+| LaTeX template integrated with Chapters 1--4                     | Draft final Chapters 5 and 6                     |
+| Granular, non-overlapping Gantt Chart of Activities configured   | Incorporate proposal panel feedback post-defense |
+| `.cursor/` rules configured (`thesis-context`, `latex_rules`)    |                                                  |
+| Updated Chapter 4 with decoupled simulated time formulation      |                                                  |
+| Added mathematical fairness explanations for client/server KD    |                                                  |
+| **[THIS SESSION]** Claude review revisions applied:              |                                                  |
+| - CFD corrected to unlabeled (not labeled) public proxy          |                                                  |
+| - Benchmark scope: 5 → 3 datasets (CIFAR-10, CIFAR-100, FEMNIST) |                                                  |
+| - α grid: {0.1, 1.0, 10.0} → {0.1, 1.0}; K=100 row added         |                                                  |
+| - Pilot study scoped to CIFAR-10, α=0.1 (Ch. 1, 3, 4)            |                                                  |
+| - Gap synthesis sharpened: non-additive interaction effects      |                                                  |
+| - Ablation study formalized as 7 explicit configurations         |                                                  |
+| - Convergence stability metrics section removed                  |                                                  |
+| - Seeds: multiple → three; `§` Candidate Formulation renamed     |                                                  |
 
 ---
 

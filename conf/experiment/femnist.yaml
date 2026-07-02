@@ -1,0 +1,27 @@
+# FEMNIST experiment override — writer-based natural partitioning.
+# LEAF FEMNIST has ~3,550 writers; we simulate 200 writers for computational tractability.
+# Usage: uv run python scripts/run.py dataset=femnist heterogeneity=femnist experiment=femnist
+#
+# IMPORTANT: pair with heterogeneity=femnist to activate the writer partition mode.
+num_clients: 200
+batch_size: 64            # B
+local_epochs: 5           # E
+learning_rate: 0.01       # eta
+learning_rate_decay: 0.99 # gamma
+weight_decay: 0.0001      # lambda
+momentum: 0.9             # beta
+client_fraction: 0.1      # C (10% per round = 20 clients per round)
+total_rounds: 100         # R per manuscript §4.3, Table 4.1
+num_public_samples: 200   # |D_pub|
+client_gpus: 0.2
+
+bandwidth_mbps: 10.0
+compute_samples_per_sec: 200.0
+
+telemetry:
+  wandb_enabled: false
+  project: "fedmaq-experiments"
+  mode: "offline"
+  run_name: null
+
+persistence_dir: ".data_partitions/fedmd_models"

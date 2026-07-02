@@ -1,7 +1,6 @@
 """Custom Flower Strategy extending FedAvg with simulated physical time tracking and telemetry."""
 
 import logging
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -61,7 +60,11 @@ def compute_fedmaq_q_k_t(
     q_max_capped = int(max(1, np.floor(c_k / c_unit)))
 
     # Tier 2 soft quality target based on the formulation
-    if formulation == 1:
+    if formulation == 0:
+        # Alternative 0: Resource-Only hard cap — no soft quality signal.
+        # The soft target is always q_max; only Tier-1 constrains the final value.
+        q_hat = q_max
+    elif formulation == 1:
         # Alternative 1: Linear Sum
         term = gamma1 * tilde_g + gamma2 * tilde_n
         q_hat = q_min + np.round((q_max - q_min) * term)
@@ -303,6 +306,7 @@ class TelemetryFedAvg(FedAvg):
         alg_name = config.get("algorithm", {}).get("name", "")
         self.dadaquant_enabled = alg_name == "dadaquant"
         self.fedmaq_enabled = alg_name == "fedmaq"
+        self.fedavg_kd_enabled = alg_name == "fedavg_kd"
         self.q_t = int(config.get("algorithm", {}).get("q_min", 1))
         self.moving_average_history = []
         self.running_average_loss = None
@@ -315,7 +319,8 @@ class TelemetryFedAvg(FedAvg):
             f"Bandwidth (uniform): {bandwidth_mbps} Mbps. "
             f"Compute (uniform): {compute_samples_per_sec} samples/s. "
             f"Memory: {memory_desc}. "
-            f"DAdaQuant enabled: {self.dadaquant_enabled}, FedMAQ enabled: {self.fedmaq_enabled}"
+            f"DAdaQuant: {self.dadaquant_enabled}, FedMAQ: {self.fedmaq_enabled}, "
+            f"FedAvgKD: {self.fedavg_kd_enabled}"
         )
 
     def configure_fit(
@@ -635,60 +640,46 @@ class TelemetryFedAvg(FedAvg):
                 server_round, results, failures
             )
 
-        if self.fedmaq_enabled and aggregated_parameters is not None:
+        # FedMAQ / FedAvgKD: server-side Knowledge Distillation aggregation
+        if (
+            self.fedmaq_enabled or self.fedavg_kd_enabled
+        ) and aggregated_parameters is not None:
             # Server-side knowledge distillation logic for FedMAQ
             dataset_name = self.config.get("dataset", {}).get("name", "mnist")
             num_classes = int(self.config.get("dataset", {}).get("num_classes", 10))
             batch_size = int(self.config.get("experiment", {}).get("batch_size", 64))
             device = torch.device(self.config.get("device", DEVICE))
 
-            if alg_name in ["fedkd", "fedmaq"]:
+            # Student model: architecture must match the global model type.
+            # FedMAQ and FedKD use a smaller student (get_kd_student_model);
+            # FedAvgKD uses the standard model (same as other FedAvg clients).
+            if alg_name == "fedmaq":
                 student_model = get_kd_student_model(dataset_name, num_classes)
-            else:
+            else:  # fedavg_kd
                 student_model = get_model(dataset_name, num_classes)
             student_model.to(device)
             set_model_parameters(
                 student_model, parameters_to_ndarrays(aggregated_parameters)
             )
 
-            # Load teacher models
+            # Teacher models: loaded from client parameter snapshots.
+            # The teacher architecture must match the client model architecture.
             teachers = []
-            if alg_name == "fedmaq":
-                for client_proxy, fit_res in results:
-                    try:
+            for client_proxy, fit_res in results:
+                try:
+                    # Use get_kd_student_model for FedMAQ (clients train TinyCNN/SimpleCNN)
+                    # and get_model for FedAvgKD (clients train the standard model).
+                    if alg_name == "fedmaq":
+                        teacher = get_kd_student_model(dataset_name, num_classes)
+                    else:  # fedavg_kd
                         teacher = get_model(dataset_name, num_classes)
-                        client_ndarrays = parameters_to_ndarrays(fit_res.parameters)
-                        set_model_parameters(teacher, client_ndarrays)
-                        teacher.eval()
-                        teacher.to(device)
-                        teachers.append(teacher)
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to load client model directly from parameters: {e}"
-                        )
-            else:
-                persistence_dir = self.config.get("experiment", {}).get(
-                    "persistence_dir", ".data_partitions/fedmaq_models"
-                )
-                for client_proxy, fit_res in results:
-                    cid = int(fit_res.metrics.get("partition_id", -1))
-                    if cid < 0:
-                        cid = hash(client_proxy.cid) % self.num_clients
-
-                    teacher_path = Path(persistence_dir) / f"client_{cid}.pth"
-                    if teacher_path.exists():
-                        try:
-                            teacher = get_model(dataset_name, num_classes)
-                            teacher.load_state_dict(
-                                torch.load(teacher_path, map_location=device)
-                            )
-                            teacher.eval()
-                            teacher.to(device)
-                            teachers.append(teacher)
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to load teacher model from {teacher_path}: {e}"
-                            )
+                    client_ndarrays = parameters_to_ndarrays(fit_res.parameters)
+                    set_model_parameters(teacher, client_ndarrays)
+                    teacher.eval()
+                    teacher.to(device)
+                    teachers.append(teacher)
+                except Exception as e:
+                    logger.warning(f"Failed to load client model from parameters: {e}")
 
             if teachers and self.public_indices is not None:
                 try:
@@ -841,9 +832,9 @@ class TelemetryFedAvg(FedAvg):
         # Decouple client and server simulated delays
         client_sim_time = max(round_delays) if round_delays else 0.0
 
-        # Calculate server simulated time (non-zero for FedMAQ server-side distillation)
+        # Server compute time: non-zero for FedMAQ / FedAvgKD server-side distillation
         server_sim_time = 0.0
-        if alg_name == "fedmaq" and aggregated_parameters is not None:
+        if alg_name in ["fedmaq", "fedavg_kd"] and aggregated_parameters is not None:
             num_teachers = len(results)
             num_public = int(
                 self.config.get("experiment", {}).get("num_public_samples", 200)

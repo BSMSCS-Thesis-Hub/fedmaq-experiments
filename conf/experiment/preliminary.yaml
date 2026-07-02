@@ -1,15 +1,19 @@
-# General experimental hyperparameters (aligned with chapter_4.tex Table 4.1)
-# For preliminary iterative runs, use: experiment=preliminary  (K=50, R=10)
-# For fast CI / testing runs, use: +experiment=ci  (R=2, K=2)
-num_clients: 100
+# Preliminary experiment config — fast iterative runs before full benchmarking.
+# NOT for production experiments. Use experiment=preliminary for staged development.
+# Usage: uv run python scripts/run.py experiment=preliminary
+#
+# Differences from default (production):
+#   num_clients: 50  (vs 100)
+#   total_rounds: 10 (vs 100)
+num_clients: 50
 batch_size: 64            # B
 local_epochs: 5           # E
 learning_rate: 0.01       # eta (base learning rate)
 learning_rate_decay: 0.99 # gamma (per-round exponential decay factor)
 weight_decay: 0.0001      # lambda (SGD weight decay, 10^-4)
-momentum: 0.9             # beta (SGD momentum, aligned with FL literature)
+momentum: 0.9             # beta (SGD momentum)
 client_fraction: 0.1      # C (10% per round)
-total_rounds: 100         # R per manuscript §4.3, Table 4.1
+total_rounds: 10          # Preliminary staging value
 num_public_samples: 200   # |D_pub| per manuscript §4.3, Table 4.1
 client_gpus: 0.2          # GPU resource fraction allocated per client simulator
 
@@ -19,10 +23,10 @@ compute_samples_per_sec: 200.0
 
 # Telemetry settings
 telemetry:
-  wandb_enabled: false   # Set to true to log to WandB online
+  wandb_enabled: false
   project: "fedmaq-experiments"
-  mode: "offline"        # "online" or "offline"
+  mode: "offline"
   run_name: null
 
-# Local model checkpoint persistence for distillation baseline (e.g. FedMD)
+# Local model checkpoint persistence for distillation baselines (e.g. FedMD)
 persistence_dir: ".data_partitions/fedmd_models"

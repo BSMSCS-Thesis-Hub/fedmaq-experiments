@@ -8,10 +8,17 @@ alwaysApply: false
 
 **Task:** Discrete image classification only.
 
-**Datasets:** CIFAR-10, CIFAR-100, MNIST, FMNIST, FEMNIST.
+**Benchmark datasets (§4.1):** CIFAR-10, CIFAR-100, FEMNIST.
+MNIST and FMNIST are supported in the codebase but excluded from the benchmark scope.
 
-**Statistical heterogeneity:** Dirichlet ($\alpha$) partitioning only for non-IID client splits.
+**Statistical heterogeneity:**
 
-**System configuration:** Bandwidth and compute are uniform across all clients (e.g., 10 Mbps bandwidth and 200 samples/sec compute speed) to isolate other factors.
+- CIFAR-10 / CIFAR-100: Dirichlet ($\alpha$) partitioning.
+- FEMNIST: Writer-based natural partitioning (`partition: writer`) — no Dirichlet; use `heterogeneity=femnist experiment=femnist`.
+- Benchmark $\alpha \in \{0.1, 1.0\}$ (high and moderate skew). $\alpha = 10.0$ is excluded.
+- Pilot formulation study: CIFAR-10 only, $\alpha = 0.1$, variable memory $\mathcal{U}(2048, 16384)$ MB.
 
-Test $\alpha \in \{0.1, 1.0, 10.0\}$ from extreme skew to near-IID.
+**System configuration:** Bandwidth and compute are uniform across all clients
+(10 Mbps bandwidth, 200 samples/sec compute speed) to isolate algorithmic factors.
+Memory is heterogeneous by default: $\mathcal{U}(2048, 16384)$ MB.
+Control group uses `heterogeneity=uniform_memory` (8192 MB fixed).

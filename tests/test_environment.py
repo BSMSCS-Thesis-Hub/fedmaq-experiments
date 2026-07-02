@@ -101,6 +101,48 @@ def test_deterministic_dirichlet_partitioning(mock_dataset, tmp_path, monkeypatc
         assert client_dict1[k] == client_dict2[k]
 
 
+def test_writer_based_partitioning(mock_dataset, tmp_path, monkeypatch):
+    """Test writer-based natural partitioning (FEMNIST mode) with caching."""
+    monkeypatch.setattr("fedmaq.core.partitioning.CACHE_DIR", tmp_path)
+
+    num_clients = 3
+    num_public = 10
+    seed = 42
+
+    # First run (generates cache)
+    pub_idx1, client_dict1 = generate_partition_indices(
+        "femnist",
+        num_clients,
+        num_public_samples=num_public,
+        seed=seed,
+        partition="writer",
+    )
+
+    assert len(pub_idx1) == num_public
+    assert len(client_dict1) == num_clients
+
+    # All samples should be accounted for (public + client partitions)
+    total_client_samples = sum(len(v) for v in client_dict1.values())
+    assert len(pub_idx1) + total_client_samples == 100
+
+    # No overlap between public pool and any client partition
+    pub_set = set(pub_idx1)
+    for indices in client_dict1.values():
+        assert pub_set.isdisjoint(set(indices)), "Public pool overlaps with client data"
+
+    # Second run (retrieves from cache — writer cache key is distinct from dirichlet)
+    pub_idx2, client_dict2 = generate_partition_indices(
+        "femnist",
+        num_clients,
+        num_public_samples=num_public,
+        seed=seed,
+        partition="writer",
+    )
+    assert pub_idx1 == pub_idx2
+    for k in client_dict1.keys():
+        assert client_dict1[k] == client_dict2[k]
+
+
 def test_client_server_loaders(mock_dataset):
     """Test retrieval of client and server PyTorch DataLoaders."""
     client_dict = {"0": [0, 1, 2], "1": [3, 4]}

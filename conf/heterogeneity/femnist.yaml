@@ -1,0 +1,6 @@
+# FEMNIST heterogeneity — writer-based natural partition (no Dirichlet).
+# EMNIST byclass preserves writer locality within each class via natural ordering.
+# We approximate writer partitions by chunking each class into num_clients equal groups.
+# alpha is unused for this partition mode but retained for schema consistency.
+partition: writer
+alpha: 1.0  # Not used; present for schema consistency

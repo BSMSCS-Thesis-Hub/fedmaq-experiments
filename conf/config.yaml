@@ -11,7 +11,24 @@ hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-# Default single-run seed. For statistical controls (§4.3), run with all 5:
-#   uv run python scripts/run.py --multirun seed=0,42,123,456,789
-# Canonical seeds: [0, 42, 123, 456, 789]
+# Default single-run seed. For statistical controls (§4.3), run with 3 seeds:
+#   uv run python scripts/run.py --multirun seed=0,42,123
+# Canonical seeds: [0, 42, 123]
+#
+# Full benchmark sweep (CIFAR-10 / CIFAR-100, two alpha values, 3 seeds):
+#   uv run python scripts/run.py --multirun \
+#     dataset=cifar10,cifar100 heterogeneity=dirichlet_alpha_0.1,dirichlet_alpha_1.0 \
+#     algorithm=fedavg,fedprox,fedpaq,dadaquant,fedmd,fedkd,fedmaq \
+#     seed=0,42,123
+#
+# FEMNIST sweep (writer partition, 3 seeds):
+#   uv run python scripts/run.py --multirun \
+#     dataset=femnist heterogeneity=femnist experiment=femnist \
+#     algorithm=fedavg,fedprox,fedpaq,dadaquant,fedmd,fedkd,fedmaq \
+#     seed=0,42,123
+#
+# Pilot formulation study (§4.3): CIFAR-10, alpha=0.1, variable memory, all 4 formulations:
+#   uv run python scripts/run.py --multirun \
+#     dataset=cifar10 heterogeneity=dirichlet_alpha_0.1 algorithm=fedmaq \
+#     algorithm.formulation=0,1,2,3,4 seed=0,42,123
 seed: 42

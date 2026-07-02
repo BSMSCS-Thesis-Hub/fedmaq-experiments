@@ -82,6 +82,7 @@ def main(cfg: DictConfig) -> None:
         alpha=cfg.heterogeneity.alpha,
         num_public_samples=cfg.experiment.num_public_samples,
         seed=cfg.seed,
+        partition=OmegaConf.select(cfg, "heterogeneity.partition", default="dirichlet"),
     )
 
     # 2. Setup Telemetry
@@ -110,7 +111,7 @@ def main(cfg: DictConfig) -> None:
         # Get local model
         if cfg.algorithm.name in ["fedkd", "fedmaq"]:
             model = get_kd_student_model(cfg.dataset.name, cfg.dataset.num_classes)
-        else:
+        else:  # fedavg, fedprox, fedpaq, dadaquant, fedmd, fedavg_kd, ablation variants
             model = get_model(cfg.dataset.name, cfg.dataset.num_classes)
 
         # Determine loss hook based on algorithm
@@ -135,6 +136,7 @@ def main(cfg: DictConfig) -> None:
             from fedmaq.baselines.compression import FedKDCompressionHook
 
             compressor_hook = FedKDCompressionHook(energy=float(cfg.algorithm.tmin))
+        # fedavg_kd uses identity CompressionHook (no client-side quantization)
 
         return GenericClient(
             cid=str(partition_id),
@@ -156,7 +158,7 @@ def main(cfg: DictConfig) -> None:
             global_model = get_kd_student_model(
                 cfg.dataset.name, cfg.dataset.num_classes
             )
-        else:
+        else:  # fedavg, fedprox, fedpaq, dadaquant, fedmd, fedavg_kd, ablation variants
             global_model = get_model(cfg.dataset.name, cfg.dataset.num_classes)
 
         initial_parameters = ndarrays_to_parameters(get_model_parameters(global_model))

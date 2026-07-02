@@ -1,0 +1,19 @@
+# Ablation Arm 5: Full Multi-Adaptive Quantization WITHOUT Server-Side KD.
+# Isolates the contribution of quantization noise (math noise degradation) independently.
+# kd_epochs=0 skips the server-side distillation loop entirely.
+# Usage: uv run python scripts/run.py algorithm=fedmaq_no_kd
+name: fedmaq
+q_min: 2
+q_max: 8
+c_unit: 2048.0
+formulation: 3            # Gradient-Primary, Data-Modulated (full formula)
+gamma1: 0.5
+gamma2: 0.5
+lambda_val: 1.0
+tau_g: 0.5
+tau_n: 0.5
+
+temperature: 1.0
+kd_epochs: 0              # 0 = disable server-side KD
+server_kd_lr: 0.01
+server_kd_momentum: 0.9

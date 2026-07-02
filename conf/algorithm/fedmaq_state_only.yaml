@@ -1,0 +1,20 @@
+# Ablation Arm 4: State Awareness Only.
+# Only the local optimization state (gradient norm g_k) drives quantization; dataset size zeroed.
+# Uses formulation 1 (Linear Weighted Sum) with gamma1=1, gamma2=0.
+# q_hat = q_min + round((q_max - q_min) * tilde_g_k)
+# Usage: uv run python scripts/run.py algorithm=fedmaq_state_only
+name: fedmaq
+q_min: 2
+q_max: 8
+c_unit: 2048.0
+formulation: 1            # Linear Sum
+gamma1: 1.0               # Gradient signal only
+gamma2: 0.0               # Dataset size signal disabled
+lambda_val: 1.0
+tau_g: 0.5
+tau_n: 0.5
+
+temperature: 1.0
+kd_epochs: 1
+server_kd_lr: 0.01
+server_kd_momentum: 0.9

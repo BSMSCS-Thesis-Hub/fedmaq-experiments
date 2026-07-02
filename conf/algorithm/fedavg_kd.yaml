@@ -1,0 +1,10 @@
+# Ablation Arm 6: Server-Side KD WITHOUT Quantization (FedAvgKD).
+# Standard FedAvg weight aggregation + server-side ensemble distillation.
+# Isolates the KD module's capacity to mitigate non-IID weight divergence.
+# Clients use identity compression (no quantization); server runs KD as in FedMAQ.
+# Usage: uv run python scripts/run.py algorithm=fedavg_kd
+name: fedavg_kd
+temperature: 1.0
+kd_epochs: 1
+server_kd_lr: 0.01
+server_kd_momentum: 0.9
